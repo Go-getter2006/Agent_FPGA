@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verilog 学习平台 · 界面原型</title>
+<style>
+:root{
+  --c-primary:#3B5BDB; --c-primary-bg:#EEF2FF; --c-bg:#F6F7F9; --c-surface:#FFFFFF;
+  --c-border:#E5E7EB; --c-text:#1F2937; --c-text-2:#6B7280; --c-success:#16A34A;
+  --c-warning:#D97706; --c-error:#DC2626; --c-error-bg:#FEE2E2; --c-link:#FDE68A;
+  --q-mastered:#2563EB; --q-fragile:#D97706; --q-design:#7C3AED; --q-concept:#6B7280;
+  --l-learning:#BFDBFE; --l-none:#E5E7EB;
+  --font:"PingFang SC","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",system-ui,sans-serif;
+  --mono:"JetBrains Mono","Fira Code",Consolas,Menlo,monospace;
+  --shadow:0 1px 2px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#E9ECF1;color:var(--c-text);font:14px/1.6 var(--font)}
+button,input,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+
+/* 原型切换栏（不属于产品界面） */
+.proto-bar{position:relative;display:flex;align-items:center;gap:16px;padding:10px 16px;background:#111827;color:#fff;flex-wrap:wrap}
+.proto-title{font-size:13px;opacity:.85}
+.proto-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.proto-tabs button{border:1px solid #374151;background:#1F2937;color:#D1D5DB;padding:4px 12px;border-radius:6px;cursor:pointer}
+.proto-tabs button.on{background:var(--c-primary);border-color:var(--c-primary);color:#fff}
+.stage{padding:16px;overflow:auto}
+.screen{display:none;width:1360px;margin:0 auto;background:var(--c-bg);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.12);overflow:hidden}
+.screen.on{display:block}
+
+/* 通用组件 */
+.card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid var(--c-border);font-weight:600;font-size:15px}
+.card-h small{font-weight:400;color:var(--c-text-2);font-size:12px}
+.card-b{padding:14px 16px}
+.btn{height:32px;padding:0 14px;border:1px solid var(--c-border);background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--c-primary);border-color:var(--c-primary);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--c-primary);padding:0 6px}
+.btn.sm{height:26px;padding:0 10px;font-size:12px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;background:#F3F4F6;color:#4B5563;font-size:12px;white-space:nowrap}
+.chip.blue{background:var(--c-primary-bg);color:var(--c-primary)}
+.muted{color:var(--c-text-2)}
+.mono{font-family:var(--mono)}
+.ok{color:var(--c-success)} .warn{color:var(--c-warning)} .bad{color:var(--c-error)}
+.qbadge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.qbadge i{font-style:normal}
+.q-mastered{background:#DBEAFE;color:var(--q-mastered)}
+.q-fragile{background:#FEF3C7;color:#B45309}
+.q-design{background:#EDE9FE;color:var(--q-design)}
+.q-concept{background:#F3F4F6;color:#4B5563}
+
+/* ===== 学生 · 做题工作台 ===== */
+.ws-top{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;background:#fff;border-bottom:1px solid var(--c-border)}
+.ws-top .back{color:var(--c-text-2);text-decoration:none;font-size:13px;margin-right:4px}
+.ws-title{font-size:17px;font-weight:600;margin-right:4px}
+.steps{display:flex;gap:4px;margin:0 auto;padding:0;list-style:none}
+.steps li{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;color:var(--c-text-2);font-size:13px}
+.steps li span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:#E5E7EB;color:#6B7280}
+.steps li.done{color:var(--c-text)}
+.steps li.done span{background:#DCFCE7;color:var(--c-success)}
+.steps li.cur{background:var(--c-primary-bg);color:var(--c-primary);font-weight:600}
+.steps li.cur span{background:var(--c-primary);color:#fff}
+.steps li.skip{opacity:.45}
+.steps li.skip em{font-style:normal;font-size:11px}
+.steps .sep{color:#D1D5DB;align-self:center}
+.ws-body{display:grid;grid-template-columns:300px minmax(0,1fr) 340px;gap:12px;padding:12px;height:968px}
+.col{display:flex;flex-direction:column;gap:12px;min-height:0}
+.task li{list-style:none;display:grid;grid-template-columns:22px 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed var(--c-border)}
+.task li:last-child{border-bottom:0}
+.task ul{margin:0;padding:0}
+.tick{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;margin-top:2px}
+.tick.y{background:#DCFCE7;color:var(--c-success)}
+.tick.n{border:1.5px solid var(--c-primary);color:var(--c-primary)}
+.task .ans{font-size:12px;color:var(--c-text-2)}
+.task textarea{width:100%;height:70px;margin-top:6px;border:1px solid var(--c-primary);border-radius:6px;padding:6px 8px;resize:none;font-size:13px;outline:3px solid var(--c-primary-bg)}
+.spec p{font-size:13px;color:#374151}
+.kv{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.kv .it{display:flex;flex-direction:column}
+.kv .lb{font-size:12px;color:var(--c-text-2)}
+.bar{height:6px;border-radius:3px;background:#F3F4F6;overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;background:var(--c-warning)}
+
+.editor{display:flex;flex-direction:column;min-height:0}
+.ed-h{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--c-border);font-size:13px}
+.ed-h .file{font-family:var(--mono);font-weight:600}
+.code{font:12px/16.5px var(--mono);padding:8px 0;overflow:hidden;background:#FCFCFD}
+.ln{display:grid;grid-template-columns:44px 1fr;white-space:pre;border-left:3px solid transparent}
+.ln .no{color:#9CA3AF;text-align:right;padding-right:12px;user-select:none}
+.ln.drv{background:var(--c-link);border-left-color:var(--c-primary)}
+.ln.pick .no{color:var(--c-primary);font-weight:700}
+.kw{color:#1D4ED8} .cm{color:#9CA3AF;font-style:italic} .nm{color:#B45309} .ty{color:#0F766E}
+.drv-note{margin-left:auto;font-size:12px;color:#92400E;background:var(--c-link);padding:1px 8px;border-radius:4px}
+
+.dock-tabs{display:flex;gap:2px;padding:0 8px;border-bottom:1px solid var(--c-border)}
+.dock-tabs button{border:0;background:transparent;padding:10px 12px;color:var(--c-text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.dock-tabs button.on{color:var(--c-primary);border-bottom-color:var(--c-primary);font-weight:600}
+.dock-tabs .right{margin-left:auto;align-self:center;font-size:12px;color:var(--c-text-2)}
+.wave-wrap{padding:10px 12px 6px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--c-text-2);padding:0 12px 12px}
+.legend b{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:4px}
+
+.ladder .lv{border:1px solid var(--c-border);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.ladder .lv.open{border-color:#C7D2FE;background:#FAFBFF}
+.ladder .lv-h{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}
+.ladder .lv p{font-size:13px;margin-top:6px;color:#374151}
+.ladder .lv .q{margin-top:6px;font-size:13px;color:var(--c-primary);font-weight:600}
+.ladder .lock{color:var(--c-text-2);font-weight:400;font-size:12px}
+.chat{display:flex;flex-direction:column;flex:1;min-height:0}
+.msgs{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.msg{max-width:88%;padding:8px 12px;border-radius:10px;font-size:13px}
+.msg.me{align-self:flex-end;background:var(--c-primary);color:#fff;border-bottom-right-radius:3px}
+.msg.ai{align-self:flex-start;background:#F3F4F6;border-bottom-left-radius:3px}
+.chat-in{border-top:1px solid var(--c-border);padding:10px 12px}
+.chat-in .tip{font-size:11px;color:var(--c-text-2);margin-bottom:6px}
+.chat-in .box{display:flex;gap:8px}
+.chat-in input{flex:1;height:32px;border:1px solid var(--c-border);border-radius:6px;padding:0 10px}
+
+/* ===== 学生 · 我的学情 ===== */
+.topnav{height:56px;display:flex;align-items:center;gap:28px;padding:0 24px;background:#fff;border-bottom:1px solid var(--c-border)}
+.brand{font-weight:700;display:flex;align-items:center;gap:8px}
+.brand .logo{width:24px;height:24px;border-radius:6px;background:var(--c-primary);color:#fff;display:grid;place-items:center;font:700 12px var(--mono)}
+.topnav nav{display:flex;gap:4px}
+.topnav nav a{padding:6px 12px;border-radius:6px;color:var(--c-text-2);text-decoration:none}
+.topnav nav a.on{background:var(--c-primary-bg);color:var(--c-primary);font-weight:600}
+.topnav .me{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-text-2)}
+.avatar{width:28px;height:28px;border-radius:50%;background:#C7D2FE;color:var(--c-primary);display:grid;place-items:center;font-weight:700;font-size:12px}
+.page{padding:24px}
+.page-h{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+.page-h h1{font-size:20px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+.kpi{padding:16px}
+.kpi .t{font-size:13px;color:var(--c-text-2)}
+.kpi .n{font:600 28px/1.25 var(--font);margin-top:4px}
+.kpi .n small{font-size:14px;color:var(--c-text-2);font-weight:400;margin-left:4px}
+.kpi .d{font-size:12px;margin-top:4px}
+.kpi .icon{float:right;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:15px}
+.mmap{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kp{border-radius:8px;padding:10px 12px;min-height:66px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid transparent}
+.kp .name{font-size:13px;font-weight:600}
+.kp .lvl{font-size:12px;display:flex;align-items:center;gap:4px}
+.lv-mastered{background:#DBEAFE;color:#1E40AF}
+.lv-fragile{background:#FEF3C7;color:#92400E;border-color:#FCD34D}
+.lv-learning{background:#EFF6FF;color:#1D4ED8;border:1px dashed #93C5FD}
+.lv-none{background:#F3F4F6;color:#6B7280}
+.mlegend{display:flex;gap:16px;font-size:12px;color:var(--c-text-2);margin-top:12px;flex-wrap:wrap}
+.list .row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6}
+.list .row:last-child{border-bottom:0}
+.list .row .main{flex:1;min-width:0}
+.list .row .main b{display:block;font-size:13px}
+.list .row .main span{font-size:12px;color:var(--c-text-2)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.badges{display:flex;gap:10px;flex-wrap:wrap}
+.badge{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--c-border);border-radius:8px;font-size:13px;background:#FAFAFA}
+.badge .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#DCFCE7;color:var(--c-success);font-weight:700}
+.note{font-size:12px;color:var(--c-text-2);text-align:center;margin-top:16px}
+
+/* ===== 教师 · 班级概览 ===== */
+.t-wrap{display:grid;grid-template-columns:220px 1fr;min-height:1060px}
+.side{background:#fff;border-right:1px solid var(--c-border);padding:14px 10px}
+.side .brand{padding:6px 10px 16px}
+.side a{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;color:#4B5563;text-decoration:none;font-size:14px;margin-bottom:2px}
+.side a i{font-style:normal;width:18px;text-align:center;color:#9CA3AF}
+.side a.on{background:var(--c-primary-bg);color:var(--c-primary);font-weight:600}
+.side a.on i{color:var(--c-primary)}
+.side .grp{font-size:12px;color:#9CA3AF;padding:14px 12px 6px}
+.t-top{height:56px;display:flex;align-items:center;gap:12px;padding:0 24px;background:#fff;border-bottom:1px solid var(--c-border)}
+.t-top .sel{display:flex;align-items:center;gap:6px;border:1px solid var(--c-border);border-radius:6px;padding:4px 10px;font-weight:600}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--c-text-2);margin-left:auto}
+.switch b{width:34px;height:20px;border-radius:10px;background:var(--c-primary);position:relative;display:inline-block}
+.switch b::after{content:"";position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+.g-7-5{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.g-5-7{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+.hbar{display:grid;grid-template-columns:minmax(0,1fr) 200px 44px;gap:10px;align-items:center;font-size:13px;padding:6px 0}
+.hbar .track{height:10px;border-radius:5px;background:#F3F4F6;overflow:hidden}
+.hbar .track i{display:block;height:100%;border-radius:5px;background:var(--c-primary)}
+.src{font-size:11px;padding:0 6px;border-radius:3px;margin-left:6px;vertical-align:1px}
+.src.p{background:#FEF3C7;color:#92400E}
+.src.j{background:#E0E7FF;color:#3730A3}
+.risk .row .main b{font-family:var(--mono)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;color:var(--c-text-2);font-weight:500;padding:10px 12px;background:#FAFAFB;border-bottom:1px solid var(--c-border)}
+.tbl td{padding:10px 12px;border-bottom:1px solid #F3F4F6}
+.tbl td.r,.tbl th.r{text-align:right}
+.filters{display:flex;gap:6px}
+.filters span{font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--c-border);color:var(--c-text-2)}
+.filters span.on{border-color:var(--c-primary);color:var(--c-primary);background:var(--c-primary-bg)}
+</style>
+</head>
+<body>
+
+<header class="proto-bar">
+  <div class="proto-title">界面原型 · 静态示意，数据为虚构，仅用于对照布局与配色</div>
+  <nav class="proto-tabs">
+    <button data-screen="ws" class="on">学生 · 做题工作台</button>
+    <button data-screen="report">学生 · 我的学情</button>
+    <button data-screen="teacher">教师 · 班级概览</button>
+  </nav>
+</header>
+
+<main class="stage">
+
+<!-- ================= 学生 · 做题工作台 ================= -->
+<section id="ws" class="screen on" aria-label="学生做题工作台">
+  <div class="ws-top">
+    <a class="back" href="#">← 题目</a>
+    <div class="ws-title">序列检测器（101）</div>
+    <span class="chip">状态机</span><span class="chip">时序逻辑</span><span class="chip blue">创作题</span>
+    <ol class="steps" aria-label="PRIMM 五步">
+      <li class="done"><span>✓</span>预测</li><li class="sep">›</li>
+      <li class="done"><span>✓</span>运行</li><li class="sep">›</li>
+      <li class="cur"><span>3</span>探究</li><li class="sep">›</li>
+      <li class="skip"><span>4</span>修改 <em>本题无</em></li><li class="sep">›</li>
+      <li><span>5</span>创作</li>
+    </ol>
+    <button class="btn">重新预测并仿真</button>
+    <button class="btn primary">提交解释</button>
+  </div>
+
+  <div class="ws-body">
+    <!-- 左栏 -->
+    <div class="col">
+      <div class="card task">
+        <div class="card-h">第 ③ 步 · 探究 <small>2 / 3 已完成</small></div>
+        <div class="card-b">
+          <ul>
+            <li><div class="tick y">✓</div><div>在波形里点出第一个对不上的格子<div class="ans">你选的：STEP 3 · out ✓</div></div></li>
+            <li><div class="tick y">✓</div><div>在代码里点出决定 out 的那一行<div class="ans">你选的：第 25 行 ✓</div></div></li>
+            <li><div class="tick n">3</div><div>用一句话解释：为什么你的 out 晚了一拍？
+              <textarea aria-label="一句话解释">因为 out 写在 posedge clk 的 always 块里，所以它自己也变成了一个</textarea></div></li>
+          </ul>
+        </div>
+      </div>
+      <div class="card spec">
+        <div class="card-h">题目说明 <button class="btn ghost sm">展开</button></div>
+        <div class="card-b"><p>检测串行输入 in 中的序列 101（允许重叠）。<b>在收到最后一个 1 的那个周期</b>，out 输出 1；rst 为同步复位，高有效。</p></div>
+      </div>
+      <div class="card">
+        <div class="card-h">我的预测 <small>运行前已锁定</small></div>
+        <div class="card-b">
+          <div class="kv">
+            <div class="it"><span class="lb">波形预测（out 的 4 个格子）</span><span>对了 2 个：STEP 1 ✓ · 3 ✗ · 4 ✗ · 8 ✓</span></div>
+            <div class="it"><span class="lb">会综合出几个触发器</span><span>你预测 2 · 实际 3 <b class="bad">✗</b></span></div>
+            <div class="it"><span class="lb">有没有锁存器</span><span>你预测 无 · 实际 无 <b class="ok">✓</b></span></div>
+            <div class="it"><span class="lb">哪些信号成了触发器</span><span>你预测 state · 实际 state、out <b class="bad">✗</b></span></div>
+          </div>
+          <div style="margin-top:12px;font-size:12px" class="muted">预测准确率 3 / 7 = 43%</div>
+          <div class="bar"><i style="width:43%"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中栏 -->
+    <div class="col">
+      <div class="card editor">
+        <div class="ed-h"><span class="file">top_module.v</span><span class="muted">Monaco Editor · 探究步骤只读</span>
+          <span class="drv-note">黄底：驱动 out 的代码（第 24–25 行）</span></div>
+        <div class="code" id="code"></div>
+      </div>
+      <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0">
+        <div class="dock-tabs">
+          <button class="on">波形对照</button><button>硬件</button><button>顺序打乱实验</button>
+          <span class="right">数据来自 iverilog 仿真 · 时钟下降沿采样</span>
+        </div>
+        <div class="wave-wrap"><svg id="wave" width="100%" viewBox="0 0 652 300" role="img" aria-label="波形对照"></svg></div>
+        <div class="legend">
+          <span><b style="background:var(--c-error-bg);border:1px solid var(--c-error)"></b>你的电路与期望不同</span>
+          <span><b style="background:var(--c-success)"></b>预测对</span>
+          <span><b style="background:var(--c-warning)"></b>预测没对上</span>
+          <span><b style="background:var(--c-error);width:3px"></b>第一个对不上的周期</span>
+          <span><b style="background:var(--c-link)"></b>与选中代码联动的信号</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏 -->
+    <div class="col">
+      <div class="card">
+        <div class="card-h">本题状态</div>
+        <div class="card-b">
+          <span class="qbadge q-concept"><i>○</i>概念未通</span>
+          <p style="font-size:13px;margin-top:8px" class="muted">写出来的电路和你预想的不一样。先弄清 out 是在什么时候更新的。</p>
+        </div>
+      </div>
+      <div class="card ladder">
+        <div class="card-h">提示 <small>一次解锁一级</small></div>
+        <div class="card-b">
+          <div class="lv open">
+            <div class="lv-h"><span>1 级 · 定位</span><span class="chip">已查看</span></div>
+            <p>先看 STEP 3 和 STEP 4：期望 out 在 STEP 3 变成 1，你的电路到 STEP 4 才变。out 由第 24–25 行赋值。</p>
+            <div class="q">这两行写在哪种 always 块里？它们的结果在什么时刻才生效？</div>
+          </div>
+          <div class="lv">
+            <div class="lv-h"><span>2 级 · 概念</span><span class="lock">先完成一次定位或等 30 秒</span></div>
+            <button class="btn sm" style="margin-top:8px" disabled>再给我一点提示</button>
+          </div>
+          <div class="lv">
+            <div class="lv-h"><span>3 级 · 类比</span><span class="lock">🔒 解锁 2 级后可用</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card chat">
+        <div class="card-h">问助教 <small>DeepSeek · 不会直接给答案</small></div>
+        <div class="msgs">
+          <div class="msg me">为什么我的 out 会晚一拍？</div>
+          <div class="msg ai">你在第 25 行用 &lt;= 给 out 赋值，而且写在 posedge clk 的块里。想一想：这样写，out 本身会被综合成什么？可以到“硬件”标签页，看看 Yosys 统计出了几个触发器。</div>
+          <div class="msg me">3 个……那多出来的一个就是 out？</div>
+          <div class="msg ai">对，这正是你要在左边写下的解释。再想一步：题目要求“收到最后一个 1 的那个周期”就输出，out 应该直接由什么决定？</div>
+        </div>
+        <div class="chat-in">
+          <div class="tip">助教只给思路，不给代码</div>
+          <div class="box"><input placeholder="问助教……"><button class="btn primary">发送</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 学生 · 我的学情 ================= -->
+<section id="report" class="screen" aria-label="学生我的学情">
+  <div class="topnav">
+    <div class="brand"><span class="logo">V</span>数字电路 · Verilog 学习平台</div>
+    <nav><a href="#">学习首页</a><a href="#">题目</a><a href="#">复习 <span class="chip blue" style="height:18px">3</span></a><a href="#" class="on">我的学情</a></nav>
+    <div class="me"><span class="avatar">李</span>李同学</div>
+  </div>
+  <div class="page">
+    <div class="page-h"><h1>我的学情</h1><span class="muted">近两周 · 只显示你自己的数据</span></div>
+
+    <div class="grid g4">
+      <div class="card kpi"><span class="icon" style="background:#DBEAFE;color:var(--q-mastered)">●</span><div class="t">真掌握的知识点</div><div class="n">4<small>/ 11</small></div><div class="d muted">写得对，也能预测对</div></div>
+      <div class="card kpi"><span class="icon" style="background:#FEF3C7;color:#B45309">◐</span><div class="t">会写但没把握</div><div class="n">3<small>个知识点</small></div><div class="d"><a href="#" style="color:var(--c-primary);text-decoration:none">去复习 →</a></div></div>
+      <div class="card kpi"><span class="icon" style="background:#DCFCE7;color:var(--c-success)">∿</span><div class="t">波形预测准确率</div><div class="n">72%</div><div class="d ok">↑ 8% 比上两周</div></div>
+      <div class="card kpi"><span class="icon" style="background:#EDE9FE;color:var(--q-design)">⚑</span><div class="t">testbench 抓 bug</div><div class="n">3<small>/ 4</small></div><div class="d muted">最近一道创作题</div></div>
+    </div>
+
+    <div class="grid g-7-5" style="margin-top:16px">
+      <div class="card">
+        <div class="card-h">知识点掌握图 <small>按课程顺序</small></div>
+        <div class="card-b">
+          <div class="mmap" id="mmap"></div>
+          <div class="mlegend">
+            <span>● 真掌握：写对且预测对</span><span>◐ 会写但没把握：写对了，但预测不准</span><span>◌ 学习中</span><span>– 未开始</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h">预测准确率趋势 <small>按周</small></div>
+        <div class="card-b"><svg id="trend-s" width="100%" viewBox="0 0 500 250" data-w="500" data-h="250" role="img" aria-label="预测准确率趋势"></svg></div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:5fr 4fr 4fr;margin-top:16px">
+      <div class="card list">
+        <div class="card-h">会写但没把握 <small>代码对了，预测没对上</small></div>
+        <div class="card-b">
+          <div class="row"><span class="dot" style="background:var(--q-fragile)"></span><div class="main"><b>序列检测器（101）</b><span>输出时序差了一拍</span></div><button class="btn sm">去复习</button></div>
+          <div class="row"><span class="dot" style="background:var(--q-fragile)"></span><div class="main"><b>8 位移位寄存器</b><span>分不清哪些信号会变成触发器</span></div><button class="btn sm">去复习</button></div>
+          <div class="row"><span class="dot" style="background:var(--q-fragile)"></span><div class="main"><b>两个 always 块交换数据</b><span>结果依赖 always 块的先后顺序</span></div><button class="btn sm">去复习</button></div>
+        </div>
+      </div>
+      <div class="card list">
+        <div class="card-h">待复习 <small>间隔 1 / 3 / 7 / 14 天</small></div>
+        <div class="card-b">
+          <div class="row"><span class="dot" style="background:var(--c-primary)"></span><div class="main"><b>预测：计数器在第 6 拍的值</b><span>今天到期 · 第 1 轮</span></div></div>
+          <div class="row"><span class="dot" style="background:var(--c-primary)"></span><div class="main"><b>预测：会综合出几个触发器</b><span>今天到期 · 第 2 轮</span></div></div>
+          <div class="row"><span class="dot" style="background:var(--c-primary)"></span><div class="main"><b>预测：交换 always 块后结果变不变</b><span>今天到期 · 第 1 轮</span></div></div>
+          <div class="row"><span class="dot" style="background:#D1D5DB"></span><div class="main"><b>还有 2 条</b><span>明天到期</span></div></div>
+        </div>
+      </div>
+      <div class="card list">
+        <div class="card-h">最近遇到的误区</div>
+        <div class="card-b">
+          <div class="row"><div class="main"><b>组合逻辑没写全，生成了锁存器</b><span>出现 2 次 · 最近：多路选择器</span></div><button class="btn ghost sm">去练习</button></div>
+          <div class="row"><div class="main"><b>时序逻辑里用了 =（阻塞赋值）</b><span>出现 1 次 · 最近：移位寄存器</span></div><button class="btn ghost sm">去练习</button></div>
+          <div class="badges" style="margin-top:12px">
+            <div class="badge"><span class="ic">✓</span>顺序打乱实验通过</div>
+            <div class="badge"><span class="ic">✓</span>testbench 满分 ×1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">这里不显示排名，也不和同学比较。</p>
+  </div>
+</section>
+
+<!-- ================= 教师 · 班级概览 ================= -->
+<section id="teacher" class="screen" aria-label="教师班级概览">
+  <div class="t-wrap">
+    <aside class="side">
+      <div class="brand"><span class="logo">V</span>教师端</div>
+      <a href="#" class="on"><i>▦</i>班级概览</a>
+      <a href="#"><i>▤</i>学情热力图</a>
+      <a href="#"><i>◎</i>误区分析</a>
+      <a href="#"><i>▥</i>题目分析</a>
+      <a href="#"><i>☰</i>学生详情</a>
+      <div class="grp">教学</div>
+      <a href="#"><i>✎</i>作业与题库</a>
+      <a href="#"><i>☷</i>班级管理</a>
+      <div class="grp">研究</div>
+      <a href="#"><i>⚗</i>实验分组与导出</a>
+    </aside>
+    <div>
+      <div class="t-top">
+        <span class="sel">示例班级 A · 2026 秋 ▾</span>
+        <span class="muted" style="font-size:13px">实验组 30 人 · 对照组 30 人</span>
+        <span class="switch">匿名显示 <b></b></span>
+      </div>
+      <div class="page">
+        <div class="grid g5">
+          <div class="card kpi"><div class="t">本周活跃</div><div class="n">52<small>/ 60</small></div><div class="d ok">↑ 4 人</div></div>
+          <div class="card kpi"><div class="t">作业完成率</div><div class="n">78%</div><div class="d ok">↑ 6%</div></div>
+          <div class="card kpi"><div class="t">全班预测准确率</div><div class="n">68%</div><div class="d ok">↑ 5%</div></div>
+          <div class="card kpi"><div class="t">全班 F 值（脆弱率）</div><div class="n">0.31</div><div class="d ok">↓ 0.05（越低越好）</div></div>
+          <div class="card kpi"><div class="t">平均提示等级</div><div class="n">1.4</div><div class="d ok">↓ 0.2</div></div>
+        </div>
+
+        <div class="grid g-5-7" style="margin-top:16px">
+          <div class="card">
+            <div class="card-h">近 8 周趋势 <small>实验组</small></div>
+            <div class="card-b"><svg id="trend-t" width="100%" viewBox="0 0 420 230" data-w="420" data-h="230" role="img" aria-label="近8周趋势"></svg></div>
+          </div>
+          <div class="card">
+            <div class="card-h">常见误区 Top 5 <small><span class="src p">预测误区</span><span class="src j">裁判标签</span></small></div>
+            <div class="card-b" id="mis"></div>
+          </div>
+        </div>
+
+        <div class="grid g-7-5" style="margin-top:16px">
+          <div class="card">
+            <div class="card-h">学情热力图（节选） <span class="filters"><span class="on">全部</span><span>实验组</span><span>对照组</span></span></div>
+            <div class="card-b"><svg id="heat" width="100%" viewBox="0 0 600 316" role="img" aria-label="学情热力图"></svg></div>
+          </div>
+          <div class="card list risk">
+            <div class="card-h">需要关注的学生 <small>4 人</small></div>
+            <div class="card-b">
+              <div class="row"><span class="dot" style="background:var(--q-fragile)"></span><div class="main"><b>S07</b><span>时序逻辑、状态机两个核心知识点 F ≥ 0.5</span></div><button class="btn sm">查看详情</button></div>
+              <div class="row"><span class="dot" style="background:var(--c-error)"></span><div class="main"><b>S03</b><span>近 10 次重复提交，盲改率 80%</span></div><button class="btn sm">查看详情</button></div>
+              <div class="row"><span class="dot" style="background:var(--q-concept)"></span><div class="main"><b>S09</b><span>状态机连续 3 次“概念未通”</span></div><button class="btn sm">查看详情</button></div>
+              <div class="row"><span class="dot" style="background:#D1D5DB"></span><div class="main"><b>S11</b><span>7 天没有任何操作</span></div><button class="btn sm">查看详情</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-h">题目速览 <small>本周作业</small></div>
+          <table class="tbl">
+            <thead><tr><th>题目</th><th>知识点</th><th class="r">通过率</th><th class="r">F 值</th><th class="r">盲改率</th><th class="r">平均提示等级</th><th class="r">平均用时</th></tr></thead>
+            <tbody>
+              <tr><td>序列检测器（101）</td><td><span class="chip">状态机</span></td><td class="r">71%</td><td class="r warn">0.42</td><td class="r">38%</td><td class="r">1.8</td><td class="r">26 分钟</td></tr>
+              <tr><td>8 位移位寄存器</td><td><span class="chip">时序逻辑</span></td><td class="r">88%</td><td class="r warn">0.37</td><td class="r">22%</td><td class="r">1.2</td><td class="r">14 分钟</td></tr>
+              <tr><td>4 选 1 多路选择器</td><td><span class="chip">组合 always</span></td><td class="r">93%</td><td class="r">0.18</td><td class="r">15%</td><td class="r">0.9</td><td class="r">9 分钟</td></tr>
+              <tr><td>两个 always 块交换数据</td><td><span class="chip">并行与竞争</span></td><td class="r">64%</td><td class="r warn">0.45</td><td class="r">41%</td><td class="r">2.1</td><td class="r">31 分钟</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+/* 原型切换与缩放（不属于产品界面） */
+document.querySelectorAll('.proto-tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.proto-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === b.dataset.screen));
+});
+function fit(){ const s = Math.min(1, (window.innerWidth - 32) / 1360);
+  document.querySelectorAll('.screen').forEach(el => el.style.zoom = s < 1 ? s : ''); }
+window.addEventListener('resize', fit); fit();
+document.querySelectorAll('.msgs').forEach(m => m.scrollTop = m.scrollHeight);
+
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent, text){ const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e); return e; }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* 代码（学生自己的代码，输出 out 多打了一拍） */
+const CODE = [
+ ['<span class="kw">module</span> top_module ('],
+ ['    <span class="kw">input</span>  <span class="ty">wire</span> clk,'],
+ ['    <span class="kw">input</span>  <span class="ty">wire</span> rst,      <span class="cm">// 同步复位，高有效</span>'],
+ ['    <span class="kw">input</span>  <span class="ty">wire</span> in,'],
+ ['    <span class="kw">output</span> <span class="ty">reg</span>  out'],
+ [');'],
+ ['    <span class="kw">localparam</span> S0 = <span class="nm">2\'d0</span>, S1 = <span class="nm">2\'d1</span>,   <span class="cm">// S1：已收到 "1"</span>'],
+ ['               S2 = <span class="nm">2\'d2</span>, S3 = <span class="nm">2\'d3</span>;   <span class="cm">// S2："10"，S3："101"</span>'],
+ [''],
+ ['    <span class="ty">reg</span> [<span class="nm">1</span>:<span class="nm">0</span>] state;'],
+ [''],
+ ['    <span class="kw">always</span> @(<span class="kw">posedge</span> clk) <span class="kw">begin</span>'],
+ ['        <span class="kw">if</span> (rst) state &lt;= S0;'],
+ ['        <span class="kw">else</span> <span class="kw">case</span> (state)'],
+ ['            S0: state &lt;= in ? S1 : S0;'],
+ ['            S1: state &lt;= in ? S1 : S2;'],
+ ['            S2: state &lt;= in ? S3 : S0;'],
+ ['            S3: state &lt;= in ? S1 : S2;'],
+ ['        <span class="kw">endcase</span>'],
+ ['    <span class="kw">end</span>'],
+ [''],
+ ['    <span class="cm">// 输出：检测到 101 时为 1</span>'],
+ ['    <span class="kw">always</span> @(<span class="kw">posedge</span> clk) <span class="kw">begin</span>'],
+ ['        <span class="kw">if</span> (rst) out &lt;= <span class="nm">1\'b0</span>;'],
+ ['        <span class="kw">else</span>     out &lt;= (state == S3);'],
+ ['    <span class="kw">end</span>'],
+ ['<span class="kw">endmodule</span>'],
+];
+document.getElementById('code').innerHTML = CODE.map((l, i) => {
+  const n = i + 1, cls = (n === 24 || n === 25) ? ' drv' : '', pick = n === 25 ? ' pick' : '';
+  return `<div class="ln${cls}${pick}"><span class="no">${n}</span><span>${l[0] || ' '}</span></div>`;
+}).join('');
+
+/* 波形对照：数据与 docs/judge.md 的示例一致 */
+(function drawWave(){
+  const svg = document.getElementById('wave');
+  const N = 10, X0 = 128, CW = 52, RH = 34, Y0 = 34;
+  const rows = [
+    {name:'clk', type:'clk'},
+    {name:'rst', type:'bit', v:[1,0,0,0,0,0,0,0,0,0]},
+    {name:'in',  type:'bit', v:[0,1,0,1,0,1,0,0,1,0]},
+    {name:'state', note:'仅供观察', type:'bus', v:['S0','S1','S2','S3','S2','S3','S2','S0','S1','S2']},
+    {name:'out', note:'期望', type:'bit', v:[0,0,0,1,0,1,0,0,0,0], linked:true},
+    {name:'out', note:'你的电路', type:'bit', v:[0,0,0,0,1,0,1,0,0,0], linked:true, cmpTo:4,
+     pred:{1:0, 3:1, 4:0, 8:0}},
+  ];
+  const first = 3, txt = css('--c-text'), sub = css('--c-text-2');
+  // STEP 序号
+  for (let i = 0; i < N; i++) el('text', {x: X0 + i*CW + CW/2, y: 14, 'text-anchor':'middle', 'font-size':11, fill: sub, 'font-family':'var(--mono)'}, svg, i);
+  el('text', {x: 8, y: 14, 'font-size':11, fill: sub}, svg, 'STEP');
+  // 网格竖线
+  for (let i = 0; i <= N; i++) el('line', {x1: X0 + i*CW, y1: 20, x2: X0 + i*CW, y2: Y0 + rows.length*RH, stroke:'#F1F2F4'}, svg);
+  rows.forEach((r, ri) => {
+    const top = Y0 + ri*RH, hi = top + 8, lo = top + RH - 8, mid = (hi + lo) / 2;
+    if (r.linked) el('rect', {x: 2, y: top + 5, width: X0 - 10, height: RH - 10, rx: 4, fill: css('--c-link')}, svg);
+    el('text', {x: X0 - 12, y: mid + 1, 'text-anchor':'end', 'dominant-baseline':'middle', 'font-size':12.5, 'font-family':'var(--mono)', fill: txt, 'font-weight': 600}, svg, r.name);
+    if (r.note) el('text', {x: 8, y: mid + 1, 'dominant-baseline':'middle', 'font-size':10.5, fill: sub}, svg, r.note);
+    // 与期望不同的格子
+    if (r.cmpTo !== undefined) for (let i = 0; i < N; i++) if (r.v[i] !== rows[r.cmpTo].v[i])
+      el('rect', {x: X0 + i*CW + 1, y: top + 3, width: CW - 2, height: RH - 6, rx: 3, fill: css('--c-error-bg'), stroke: css('--c-error'), 'stroke-width': 1}, svg);
+    if (r.type === 'clk') {
+      let d = `M${X0},${lo}`;
+      for (let i = 0; i < N; i++) { const x = X0 + i*CW; d += ` L${x},${lo} L${x},${hi} L${x+CW/2},${hi} L${x+CW/2},${lo} L${x+CW},${lo}`;
+        el('path', {d:`M${x-3},${hi+6} L${x},${hi} L${x+3},${hi+6}`, fill:'none', stroke: txt, 'stroke-width':1.2}, svg); }
+      el('path', {d, fill:'none', stroke: txt, 'stroke-width':1.5}, svg);
+    } else if (r.type === 'bit') {
+      let d = '';
+      for (let i = 0; i < N; i++) { const y = r.v[i] ? hi : lo, x = X0 + i*CW;
+        d += (i === 0 ? `M${x},${y}` : ` L${x},${y}`) + ` L${x+CW},${y}`; }
+      el('path', {d, fill:'none', stroke: txt, 'stroke-width':1.6}, svg);
+    } else if (r.type === 'bus') {
+      let s = 0;
+      for (let i = 1; i <= N; i++) if (i === N || r.v[i] !== r.v[s]) {
+        const xa = X0 + s*CW + 1, xb = X0 + i*CW - 1, k = 5;
+        el('path', {d:`M${xa},${mid} L${xa+k},${hi} L${xb-k},${hi} L${xb},${mid} L${xb-k},${lo} L${xa+k},${lo} Z`, fill: css('--c-primary-bg'), stroke:'#6366F1', 'stroke-width':1}, svg);
+        el('text', {x:(xa+xb)/2, y: mid + 1, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11.5, 'font-family':'var(--mono)', fill:'#3730A3'}, svg, r.v[s]);
+        s = i; }
+    }
+    // 预测徽标
+    if (r.pred) for (const k in r.pred) { const i = +k, okp = r.pred[k] === r.v[i], cx = X0 + i*CW + CW - 9, cy = top + 9;
+      el('circle', {cx, cy, r: 7, fill: okp ? css('--c-success') : css('--c-warning')}, svg);
+      el('text', {x: cx, y: cy + 0.5, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':9, fill:'#fff', 'font-weight':700}, svg, okp ? '✓' : '✗');
+      if (!okp) el('text', {x: X0 + i*CW + CW/2, y: top + RH + 12, 'text-anchor':'middle', 'font-size':10.5, fill: css('--c-warning'), 'font-weight':600}, svg, `你预测 ${r.pred[k]}`);
+    }
+  });
+  // 第一个对不上的周期
+  const fx = X0 + first*CW;
+  el('line', {x1: fx, y1: 22, x2: fx, y2: Y0 + rows.length*RH + 40, stroke: css('--c-error'), 'stroke-width': 2}, svg);
+  el('rect', {x: fx - 136, y: Y0 + rows.length*RH + 20, width: 132, height: 20, rx: 4, fill: css('--c-error')}, svg);
+  el('text', {x: fx - 70, y: Y0 + rows.length*RH + 31, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11, fill:'#fff', 'font-weight':600}, svg, '第一个对不上的周期');
+})();
+
+/* 知识点掌握图 */
+(function(){
+  const L = {m:['lv-mastered','● 真掌握'], f:['lv-fragile','◐ 会写但没把握'], l:['lv-learning','◌ 学习中'], n:['lv-none','– 未开始']};
+  const kps = [['组合逻辑与 assign','m'],['always 组合块与完整赋值','f'],['阻塞与非阻塞赋值','l'],['时序逻辑与触发器','f'],
+    ['同步 / 异步复位','m'],['计数器与分频','m'],['有限状态机','l'],['位宽、拼接与截断','m'],
+    ['模块例化与层次','n'],['testbench 与激励设计','l'],['并行与竞争','f']];
+  document.getElementById('mmap').innerHTML = kps.map(([n, k]) =>
+    `<div class="kp ${L[k][0]}"><div class="name">${n}</div><div class="lvl">${L[k][1]}</div></div>`).join('');
+})();
+
+/* 折线图 */
+function lineChart(id, labels, series, yMax, fmt){
+  const svg = document.getElementById(id), W = +svg.dataset.w, H = +svg.dataset.h;
+  const L = 40, R = 28, T = 30, B = 30, sub = css('--c-text-2');
+  const x = i => L + i * (W - L - R) / (labels.length - 1), y = v => T + (1 - v / yMax) * (H - T - B);
+  for (let g = 0; g <= 4; g++) { const v = yMax * g / 4;
+    el('line', {x1: L, y1: y(v), x2: W - R, y2: y(v), stroke:'#F1F2F4'}, svg);
+    el('text', {x: L - 8, y: y(v) + 4, 'text-anchor':'end', 'font-size':11, fill: sub}, svg, fmt(v)); }
+  labels.forEach((t, i) => el('text', {x: x(i), y: H - 10, 'text-anchor':'middle', 'font-size':11, fill: sub}, svg, t));
+  let lx = L;
+  series.forEach(s => {
+    el('polyline', {points: s.v.map((v, i) => `${x(i)},${y(v)}`).join(' '), fill:'none', stroke: s.c, 'stroke-width': 2.2, 'stroke-dasharray': s.dash || ''}, svg);
+    s.v.forEach((v, i) => el('circle', {cx: x(i), cy: y(v), r: 3, fill:'#fff', stroke: s.c, 'stroke-width': 1.8}, svg));
+    el('rect', {x: lx, y: 8, width: 14, height: 4, rx: 2, fill: s.c}, svg);
+    el('text', {x: lx + 20, y: 13, 'font-size':12, fill: css('--c-text')}, svg, s.n);
+    lx += 24 + s.n.length * 13;
+  });
+}
+lineChart('trend-s', ['第3周','第4周','第5周','第6周','第7周','第8周','第9周','第10周'],
+  [{n:'波形预测', c: css('--c-primary'), v:[48,52,55,58,61,64,68,72]},
+   {n:'硬件预测', c: css('--q-design'), v:[35,38,44,41,50,55,58,63], dash:'5 4'}], 100, v => v + '%');
+lineChart('trend-t', ['第3周','第4周','第5周','第6周','第7周','第8周','第9周','第10周'],
+  [{n:'预测准确率', c: css('--c-primary'), v:[0.51,0.54,0.56,0.58,0.61,0.63,0.65,0.68]},
+   {n:'F 值（越低越好）', c: css('--q-fragile'), v:[0.46,0.45,0.43,0.41,0.38,0.36,0.33,0.31], dash:'5 4'}], 1, v => v.toFixed(2));
+
+/* 常见误区 */
+document.getElementById('mis').innerHTML = [
+  ['输出时序差了一拍','p',21],['组合逻辑没写全，生成了锁存器','j',17],['分不清哪些信号会变成触发器','p',15],
+  ['时序逻辑里用了 =（阻塞赋值）','j',11],['结果依赖 always 块的先后顺序','j',8]]
+  .map(([t, s, n]) => `<div class="hbar"><span>${t}<span class="src ${s}">${s === 'p' ? '预测' : '裁判'}</span></span>
+    <span class="track"><i style="width:${n / 24 * 100}%;background:${s === 'p' ? 'var(--q-fragile)' : 'var(--c-primary)'}"></i></span>
+    <span class="r" style="text-align:right">${n} 人</span></div>`).join('');
+
+/* 学情热力图 */
+(function(){
+  const svg = document.getElementById('heat'), kps = ['组合','组合always','阻塞/非阻塞','时序','复位','计数器','状态机','并行'];
+  const lv = ['m','m','f','f','m','m','l','f','m','l','m','f','m','f','l','n','m','m','m','m','f','l','l','f',
+              'm','f','l','l','m','f','l','l','m','m','f','m','m','m','f','f','m','f','f','f','l','f','l','l',
+              'm','m','m','f','m','m','f','l','m','l','l','l','m','l','l','n','m','m','f','m','m','m','m','f',
+              'm','f','l','l','f','l','l','n','m','m','m','f','m','m','f','f','m','m','f','m','m','f','l','l'];
+  const C = {m: css('--q-mastered'), f: css('--q-fragile'), l: css('--l-learning'), n: css('--l-none')};
+  const X0 = 52, Y0 = 26, CW = 68, CH = 21;
+  kps.forEach((k, j) => el('text', {x: X0 + j*CW + CW/2, y: 14, 'text-anchor':'middle', 'font-size':11.5, fill: css('--c-text-2')}, svg, k));
+  for (let i = 0; i < 12; i++) {
+    el('text', {x: X0 - 10, y: Y0 + i*CH + CH/2 + 1, 'text-anchor':'end', 'dominant-baseline':'middle', 'font-size':11.5, 'font-family':'var(--mono)', fill: css('--c-text')}, svg, 'S' + String(i + 1).padStart(2, '0'));
+    for (let j = 0; j < 8; j++) { const k = lv[i*8 + j];
+      el('rect', {x: X0 + j*CW + 2, y: Y0 + i*CH + 2, width: CW - 4, height: CH - 4, rx: 3, fill: C[k]}, svg);
+      if (k === 'f') el('text', {x: X0 + j*CW + CW/2, y: Y0 + i*CH + CH/2 + 1, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':10, fill:'#fff', 'font-weight':700}, svg, '◐');
+    }
+  }
+  [['真掌握','m'],['会写但没把握','f'],['学习中','l'],['未开始','n']].forEach(([t, k], i) => {
+    const x = X0 + i * 112, y = Y0 + 12*CH + 14;
+    el('rect', {x, y, width: 12, height: 12, rx: 2, fill: C[k]}, svg);
+    el('text', {x: x + 18, y: y + 10, 'font-size':11.5, fill: css('--c-text-2')}, svg, t);
+  });
+})();
+</script>
+</body>
+</html>
