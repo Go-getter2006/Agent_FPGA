@@ -175,5 +175,5 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
     - 试验结论（iverilog 12）：交换源码里 always 块的先后会改变 iverilog 的执行顺序；`race_blocking.v` 结果随之改变，`race_nonblocking.v` 不变
     - 命令行：`python -m judge <学生代码.v> <题目ID> --shuffle`；库：`shuffle_test(code, problem_id)`，`apply_shuffle(diagnosis, shuffle)` 在顺序相关时给诊断加上 race_order_sensitive
     - 块数 ≤ 3 时穷举全部排列；更多时取倒序、左移、右移、两两交换和固定种子的随机排列，含原顺序共 6 种
-    - 输出在 9.2 节字段之外补充：`ok`、`message`（失败或无需实验时的中文说明）、`block_lines`（各 always 块在原文件中的起止行，`order` 里的编号即对应这里的下标 +1）；`variants` 每项补充 `timeout` 与 `errors`（变体编译报错，行号已映射回原文件）。变体超时或编译失败也算顺序相关
+    - 输出在 9.2 节字段之外补充：`ok`、`message`（失败或无需实验时的中文说明）、`block_lines`（各 always 块在原文件中的起止行，`order` 里的编号即对应这里的下标 +1）、`base_trace`（原顺序的仿真轨迹）；`variants` 每项补充 `timeout`、`errors`（变体编译报错，行号已映射回原文件）和 `trace`（该排列的仿真轨迹，前端 diff 模式用）。变体超时或编译失败也算顺序相关
     - 原代码编译失败或仿真超时时 `ok` 为 false、`order_sensitive` 为 null

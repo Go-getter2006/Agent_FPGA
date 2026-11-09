@@ -93,3 +93,12 @@
 - metrics.csv：anon_id, group, knowledge_point, level, r_code, r_pred, f_value, B, H, tb_score
 - data_dictionary.md：每个字段的含义与取值
 - 只含 consent_status 为已同意的学生
+
+## 6. 阶段 3 实现补充（与上文的差异）
+- 新增表：`sessions`（登录会话，库里只存令牌哈希）、`progress`（学生在每道题上的 PRIMM 步骤与状态）
+- 字段补充：`attempts.attempt_no`、`attempts.finished_at`、`attempts.error`、`attempts.analysis`（预测逐格对照与预测误区）；`predictions.result`（判完后的逐格对照）；`shuffle_runs.prediction`（实验前的预测 change / same）与 `status`；`tb_submissions.status`；`review_items.status`、`source_attempt_id`、`question`（代码、预测格；标准答案只在服务端）；`assignments.title`；`jobs.user_id`
+- 新增接口：`GET /student/testbench/{id}`（testbench 打分结果，`missed_types` 只用文字说明没抓住的 bug 类型，不给代码）、`GET /api/health`
+- `POST /student/problems/{pid}/predictions` 一次锁定波形预测和硬件问题两部分，返回 `prediction_ids`
+- 预测题、修改题在进入修改阶段之前，`POST .../attempts` 运行的一律是起始代码
+- 事件：前端只能上报 `page.view`、`step.enter`、`problem.open`、`waveform.view`、`waveform.cell_click`；其余事件由后端在对应操作里写入
+- 任务：测试时设 `JOBS_INLINE=1`，任务在请求里同步执行；正常运行用 `python -m backend.worker`

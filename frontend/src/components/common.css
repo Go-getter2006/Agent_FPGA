@@ -1,0 +1,19 @@
+.qbadge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.q-none { background: #F3F4F6; color: #6B7280; }
+.kpi { padding: 16px; }
+.kpi-t { font-size: 13px; color: var(--c-text-2); }
+.kpi-n { font: 600 28px/1.25 var(--font); margin-top: 4px; }
+.kpi-n small { font-size: 14px; color: var(--c-text-2); font-weight: 400; margin-left: 4px; }
+.kpi-d { font-size: 12px; margin-top: 4px; }
+.kpi-icon { float: right; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; }
+.mmap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.mmap.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.kp { border-radius: 8px; padding: 10px 12px; min-height: 66px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid transparent; }
+.mmap.compact .kp { min-height: 52px; padding: 8px 10px; }
+.kp .name { font-size: 13px; font-weight: 600; }
+.kp .lvl { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.mlegend { display: flex; gap: 16px; font-size: 12px; color: var(--c-text-2); margin-top: 12px; flex-wrap: wrap; }
+.badges { display: flex; gap: 10px; flex-wrap: wrap; }
+.badge { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; background: #FAFAFA; }
+.badge .ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #DCFCE7; color: var(--c-success); font-weight: 700; }
+@media (max-width: 768px) { .mmap { grid-template-columns: repeat(2, 1fr); } }

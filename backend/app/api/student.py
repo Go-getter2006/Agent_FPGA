@@ -493,9 +493,25 @@ def start_shuffle(aid: int, body: ShuffleIn, user: User = Depends(student_user),
 
 # ---------------------------------------------------------------- ⑤ 创作：testbench 打分
 
+def _bug_description(problem_id: str, case_name: str) -> str:
+    """错误样本第二行的文字说明（“// 错误：……”），只说 bug 的类型，不给代码。"""
+    path = get_settings().problems_dir / problem_id / "cases" / case_name
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return "一个错误设计"
+    text = lines[1].lstrip("/ ").strip() if len(lines) > 1 else ""
+    for prefix in ("错误：", "隐患："):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    return text or "一个错误设计"
+
+
 def _tb_payload(sub: TbSubmission) -> dict:
+    missed = (sub.result or {}).get("missed", [])
     return {"id": sub.id, "status": sub.status, "score": sub.score, "result": sub.result,
-            "created_at": sub.created_at, "code": sub.code}
+            "created_at": sub.created_at, "code": sub.code,
+            "missed_types": [_bug_description(sub.problem_id, name) for name in missed]}
 
 
 class TestbenchIn(BaseModel):

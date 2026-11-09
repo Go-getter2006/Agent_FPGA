@@ -87,7 +87,8 @@ def _simulate(work: Path, text: str, timeout: float) -> tuple[dict, list[dict], 
 
 
 def _result(*, ok: bool, order_sensitive: bool | None = None, blocks: int = 0,
-            block_lines: list | None = None, variants: list | None = None, message: str | None = None) -> dict:
+            block_lines: list | None = None, variants: list | None = None, message: str | None = None,
+            base_trace: list | None = None) -> dict:
     return {
         "ok": ok,
         "order_sensitive": order_sensitive,
@@ -95,6 +96,7 @@ def _result(*, ok: bool, order_sensitive: bool | None = None, blocks: int = 0,
         "block_lines": block_lines or [],
         "variants": variants or [],
         "message": message,
+        "base_trace": base_trace or [],     # 原顺序的轨迹（前端 diff 模式用）
     }
 
 
@@ -132,7 +134,8 @@ def _shuffle(code: str, problem, timeout: float) -> dict:
         block_lines = [[b.first_line, b.last_line] for b in blocks]
         if len(blocks) < 2:
             return _result(ok=True, order_sensitive=False, blocks=len(blocks), block_lines=block_lines,
-                           message="只有 1 个 always 块，没有可以交换的顺序" if blocks else "代码里没有 always 块")
+                           message="只有 1 个 always 块，没有可以交换的顺序" if blocks else "代码里没有 always 块",
+                           base_trace=base)
 
         variants = []
         for order in block_orders(len(blocks)):
@@ -154,11 +157,12 @@ def _shuffle(code: str, problem, timeout: float) -> dict:
                 "first_diff": diff,
                 "timeout": timed_out,
                 "errors": errors,
+                "trace": trace,
             })
 
     sensitive = any(v["first_diff"] or v["timeout"] or v["errors"] for v in variants)
     return _result(ok=True, order_sensitive=sensitive, blocks=len(blocks),
-                   block_lines=block_lines, variants=variants)
+                   block_lines=block_lines, variants=variants, base_trace=base)
 
 
 def apply_shuffle(diagnosis: dict, shuffle: dict) -> dict:

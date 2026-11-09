@@ -23,12 +23,15 @@ def test_blocking_race_is_order_sensitive():
     assert result["ok"] and result["order_sensitive"] is True
     assert result["blocks"] == 2
     assert result["block_lines"] == [[9, 12], [14, 17]]
-    assert result["variants"] == [{
+    variant = result["variants"][0]
+    assert {k: variant[k] for k in ("order", "first_diff", "timeout", "errors")} == {
         "order": [2, 1],
         "first_diff": {"step": 1, "signal": "y1", "base": "1", "variant": "0"},
         "timeout": False,
         "errors": [],
-    }]
+    }
+    assert result["base_trace"][1]["outputs"] == {"y1": "1", "y2": "1"}
+    assert variant["trace"][1]["outputs"] == {"y1": "0", "y2": "0"}
 
 
 def test_nonblocking_is_order_independent():
