@@ -1,0 +1,13 @@
+# 测试专用题目：只给顺序打乱实验的单元测试提供 testbench，不在题库里
+id: race_swap
+title: 两个寄存器互换（测试用）
+knowledge_points: [parallel, blocking]
+primm_type: predict
+difficulty: 1
+starter: ref.v
+predict_points:
+  - {signal: y1, steps: [1, 2]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 2
+expected_drivers: {}
+modify_goal: ""

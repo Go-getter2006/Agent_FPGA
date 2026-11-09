@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 from . import config
+from .drivers import compute_drivers
 from .lint import run_lint
 from .log import append_log
 from .problem import JudgeError, Problem, load_problem
@@ -77,6 +78,7 @@ def diagnose(
             hardware = null_hardware()
             lint: list[dict] = []
             multi = False
+            drivers, granularity = {}, None
         else:
             # 2. 仿真并与参考答案比较
             trace, timed_out = simulate(work, vvp, timeout)
@@ -94,6 +96,8 @@ def diagnose(
             hardware = hardware_stats(work, config.STUDENT_FILE, timeout) if synth["ok"] else null_hardware()
             # 5. 静态检查
             lint = run_lint(work, config.STUDENT_FILE, timeout)
+            # 信号 → 代码行（9.1 节）
+            drivers, granularity = compute_drivers(work, config.STUDENT_FILE, code, timeout)
 
     # 6. 标签
     tags = compute_tags(
@@ -107,7 +111,8 @@ def diagnose(
         "synth": synth,
         "hardware": hardware,
         "lint": lint,
-        "drivers": {},          # 阶段 2 填写
+        "drivers": drivers,
+        "drivers_granularity": granularity,   # statement / block；编译失败时为 null
         "tags": tags,
     }
     if log:

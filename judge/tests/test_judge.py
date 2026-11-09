@@ -106,6 +106,7 @@ def test_compile_error_skips_later_stages(run_case):
     assert result["tags"] == ["compile_error"]
     assert result["sim"] == {"ok": False, "timeout": False, "trace": [], "first_mismatch": None}
     assert result["synth"]["ok"] is None
+    assert result["drivers"] == {} and result["drivers_granularity"] is None
     assert result["hardware"] == {"ff_signals": None, "latch_signals": None, "ff_count": None, "lut_count": None}
     err = result["compile"]["errors"][0]
     assert err["file"] == "student.v" and isinstance(err["line"], int)
@@ -119,10 +120,10 @@ def test_hardware_fields(run_case):
 
 def test_output_keys_and_order(run_case):
     result = run_case(REPO_ROOT / "problems" / PID / "ref.v", PID)
-    assert list(result) == ["problem", "compile", "sim", "synth", "hardware", "lint", "drivers", "tags"]
+    assert list(result) == ["problem", "compile", "sim", "synth", "hardware", "lint",
+                            "drivers", "drivers_granularity", "tags"]
     assert list(result["sim"]) == ["ok", "timeout", "trace", "first_mismatch"]
     assert list(result["hardware"]) == ["ff_signals", "latch_signals", "ff_count", "lut_count"]
-    assert result["drivers"] == {}
 
 
 # ---------- 超时 ----------

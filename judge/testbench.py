@@ -2,7 +2,10 @@
 
 学生交一个自己写的 testbench：先用参考答案跑，确认能编译、能打印 STEP 行；
 再用 cases/ 里的每个错误样本跑同一个 testbench，轨迹与参考答案不同就算“抓住”了这个 bug。
-预期标签含 fragile_pass 的样本仿真输出与参考答案相同，任何激励都抓不到，不计入。
+
+两类样本不计入（只反映激励设计的好坏）：
+- 预期标签含 fragile_pass：仿真输出与参考答案相同，任何激励都抓不到
+- 预期标签含 compile_error：在任何激励下都编译不过，总会被“抓住”，计入等于白送分
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ from .problem import load_problem, read_expected_tags
 from .sim import compile_design, simulate
 
 STUDENT_TB_FILE = "student_tb.v"
+EXCLUDED_TAGS = frozenset({"fragile_pass", "compile_error"})
 DESIGN_FILE = "design.v"
 
 _COMMENT_RE = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
@@ -90,7 +94,7 @@ def _score(tb_code: str, problem, timeout: float) -> dict:
         # 2. 再用每个错误样本跑同一个 testbench
         caught, missed, excluded = [], [], []
         for case in problem.case_paths():
-            if "fragile_pass" in read_expected_tags(case):
+            if EXCLUDED_TAGS & set(read_expected_tags(case)):
                 excluded.append(case.name)
                 continue
             comp, trace, timed_out = _run(work, case.read_text(encoding="utf-8"), timeout)

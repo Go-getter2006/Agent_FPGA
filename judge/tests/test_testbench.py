@@ -37,8 +37,9 @@ def test_own_tb_scores_full(pid):
     assert result["ok"], result["message"]
     assert result["score"] == 1.0
     assert result["missed"] == []
-    fragile = sorted(p.name for p in problem.case_paths() if "fragile_pass" in read_expected_tags(p))
-    assert result["excluded"] == fragile
+    excluded = sorted(p.name for p in problem.case_paths()
+                      if {"fragile_pass", "compile_error"} & set(read_expected_tags(p)))
+    assert result["excluded"] == excluded
     assert result["steps"] > 0
 
 
@@ -48,10 +49,17 @@ def test_weak_tb_misses_bug():
     result = score_testbench(tb, "adder4", log=False)
     assert result["ok"]
     assert result["missed"] == ["c1_no_cin.v"]
-    assert result["caught"] == ["c2_cout_shift.v", "c3_leftover_assign.v", "c5_compile.v"]
-    assert result["excluded"] == ["c4_fragile_latch.v"]
-    assert result["score"] == 0.75
+    assert result["caught"] == ["c2_cout_shift.v", "c3_leftover_assign.v"]
+    assert result["excluded"] == ["c4_fragile_latch.v", "c5_compile.v"]
+    assert result["score"] == 0.6667
     assert result["steps"] == 3
+
+
+def test_compile_error_case_gives_no_free_points():
+    # 只测 1 + 2：一个真正的 bug 都抓不到，得分应为 0（编译错误样本不计入）
+    result = score_testbench(_adder_tb([(1, 2, 0)]), "adder4", log=False)
+    assert result["score"] == 0.0
+    assert result["caught"] == []
 
 
 def test_output_keys():

@@ -129,12 +129,12 @@ modify_goal: ""             # 修改题的目标说明
 - 学生提交自己的 testbench（必须实例化 top_module，并按第 4 节格式打印）
 - 先用 ref.v 跑学生 tb：编译失败或一行 STEP 都没有，返回中文错误说明
 - 再用 cases/ 里每个错误样本跑同一个 tb：输出轨迹与 ref.v 的轨迹不同，就算“抓住”这个 bug
-- 预期标签含 fragile_pass 的样本不计入：它们的仿真输出与参考答案相同，任何激励都抓不到
+- 不计入的样本：预期标签含 fragile_pass 的（仿真输出与参考答案相同，任何激励都抓不到），以及预期标签含 compile_error 的（任何激励下都编译不过，总会被“抓住”，计入等于白送分）。阶段 2 起改为这样
 - 得分：
 
 $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
 
-其中，$\mathcal{M}$ 为该题全部错误样本的集合，$\mathcal{E}$ 为不计入的样本（预期标签含 fragile_pass），$\mathcal{C}$ 为被学生 testbench 抓住的样本；$|\cdot|$ 表示集合中的元素个数。
+其中，$\mathcal{M}$ 为该题全部错误样本的集合，$\mathcal{E}$ 为不计入的样本（预期标签含 fragile_pass 或 compile_error），$\mathcal{C}$ 为被学生 testbench 抓住的样本；$|\cdot|$ 表示集合中的元素个数。
 
 - 输出：
 ```json
@@ -166,3 +166,14 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
     - `score` 保留 4 位小数；可计入的样本数为 0 时为 null
     - 所有仿真都带 `vvp -none`，tb 里的 `$dumpvars` 不会写波形文件
 11. **日志记录类型**：`logs/judge.jsonl` 每行带 `type`（`diagnose` / `score_testbench`）
+12. **信号 → 代码行（9.1 节）**：
+    - 试验结论（yosys 0.33）：`proc` 之后，连续赋值和运算符单元的 src 能精确到行；组合 always 块里的 if / case 只给到整条 if / case 语句的范围；时序块里寄存器的触发器单元 src 是整个 always 块；赋常数的语句（如 `q <= 0`）没有任何单元记录
+    - 做法：先用 yosys 从信号出发、沿内部连线往回找驱动单元，得到候选行范围；再用 `judge/vparse.py` 的词法扫描，在候选范围内只保留这个信号出现在赋值号左边的行。连续赋值（`assign`、`wire` 声明赋值）不受候选范围限制；子模块例化的输出取例化语句所在行；yosys 读不进的代码（如不可综合的 while）只用词法扫描结果
+    - 扫描失败或某个信号一行都找不到时，退回 yosys 的候选范围，`drivers_granularity` 记为 `"block"`，否则为 `"statement"`；编译失败时 `drivers` 为 `{}`、`drivers_granularity` 为 null
+    - `drivers` 包含除输入端口外的所有具名信号（输出、内部 reg / wire），键按字母序
+13. **顺序打乱实验（9.2 节）**：
+    - 试验结论（iverilog 12）：交换源码里 always 块的先后会改变 iverilog 的执行顺序；`race_blocking.v` 结果随之改变，`race_nonblocking.v` 不变
+    - 命令行：`python -m judge <学生代码.v> <题目ID> --shuffle`；库：`shuffle_test(code, problem_id)`，`apply_shuffle(diagnosis, shuffle)` 在顺序相关时给诊断加上 race_order_sensitive
+    - 块数 ≤ 3 时穷举全部排列；更多时取倒序、左移、右移、两两交换和固定种子的随机排列，含原顺序共 6 种
+    - 输出在 9.2 节字段之外补充：`ok`、`message`（失败或无需实验时的中文说明）、`block_lines`（各 always 块在原文件中的起止行，`order` 里的编号即对应这里的下标 +1）；`variants` 每项补充 `timeout` 与 `errors`（变体编译报错，行号已映射回原文件）。变体超时或编译失败也算顺序相关
+    - 原代码编译失败或仿真超时时 `ok` 为 false、`order_sensitive` 为 null
