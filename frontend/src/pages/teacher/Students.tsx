@@ -41,7 +41,7 @@ export default function Students() {
                   <span style={{ fontSize: 12 }}><QuadrantBadge quadrant={t.quadrant} withHint={false} />
                     <span className="muted" style={{ marginLeft: 6 }}>{t.tags.filter((x: string) => x !== 'sim_mismatch').map((x: string) => TAG_LABEL[x] ?? x).join('；')}</span></span>
                   <span>预测 {percent(t.pred_accuracy)}</span>
-                  <span>提示 {t.max_hint_level} 级</span>
+                  <span>{t.max_hint_level >= 4 ? '看过参考答案' : `提示 ${t.max_hint_level} 级`}</span>
                 </div>
                 {open === t.attempt_id && <AttemptDetail aid={t.attempt_id} />}
               </div>
@@ -102,7 +102,7 @@ function AttemptDetail({ aid }: { aid: number }) {
                 firstMismatchStep={d.judge.sim.first_mismatch?.step ?? null} clocked={d.skeleton.inputs.some((i: any) => i.name === 'rst')} />
             : <div className="muted">编译没通过：{d.judge?.compile.errors.map((e: any) => e.message).join('；')}</div>}
           {d.explanations.length > 0 && <div style={{ marginTop: 8, fontSize: 13 }}><b>一句话解释：</b>{d.explanations.join('；')}</div>}
-          {d.hints.map((h: any) => <div key={h.level} style={{ marginTop: 6, fontSize: 13 }}><b>{h.level} 级提示（{h.source === 'llm' ? 'DeepSeek' : '规则'}）：</b>{h.message} <span className="muted">{h.question}</span></div>)}
+          {d.hints.map((h: any) => <div key={h.level} style={{ marginTop: 6, fontSize: 13 }}><b>{h.level >= 4 ? '看了参考答案' : `${h.level} 级提示（${h.source === 'llm' ? 'DeepSeek' : '规则'}）`}：</b>{h.level >= 4 ? '' : h.message} <span className="muted">{h.question}</span></div>)}
           {d.chat.length > 0 && <div style={{ marginTop: 8 }}><b style={{ fontSize: 13 }}>对话记录</b>
             {d.chat.map((m: any, i: number) => <div key={i} style={{ fontSize: 13, marginTop: 4 }}>{m.role === 'user' ? '学生' : '助教'}：{m.content}{m.flagged && <span className="bad">（拦截了代码）</span>}</div>)}</div>}
         </div>

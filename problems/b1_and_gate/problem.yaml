@@ -1,0 +1,15 @@
+id: b1_and_gate
+title: 入门 1：第一个电路——与门
+knowledge_points: [comb_assign]
+primm_type: predict
+difficulty: 1
+order: 1                    # 题目列表里排在最前面
+stage: beginner             # 入门题
+starter: starter.v
+predict_points:
+  - {signal: y, steps: [1, 3, 5, 6]}
+hardware_questions: [ff_count, latch]
+expected_ff_count: 0        # 纯组合电路
+expected_drivers:
+  y: [8]
+modify_goal: ""

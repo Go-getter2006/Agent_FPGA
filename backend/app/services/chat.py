@@ -141,9 +141,10 @@ def stream_reply(llm: LlmClient, *, user_id: int, session_id: int, message_id: i
         forwarded = ""         # 实际转发给学生的文本
         ans = answer_service.status(db, user_id, problem)
         ref_code = problem.meta.get("ref_code")
+        spec = problem.meta.get("spec")
 
         def check(text: str) -> str | None:
-            return chat_leak_reason(text, ref_code, ans["revealed"])
+            return chat_leak_reason(text, ref_code, ans["revealed"], spec)
         usage = None
         model = None
         blocked = None
@@ -192,7 +193,9 @@ def stream_reply(llm: LlmClient, *, user_id: int, session_id: int, message_id: i
         llm.breaker.success()
         text = forwarded
         if blocked:
-            notice = ("\n" if forwarded else "") + LEAK_NOTICE
+            # 停在代码块中间时先把代码块关上，提示才不会显示在代码框里
+            fence = "\n```" if forwarded.count("```") % 2 == 1 else ""
+            notice = fence + ("\n\n" if forwarded else "") + LEAK_NOTICE
             text += notice
             yield _sse({"delta": notice, "source": "llm", "flagged": True})
         elif error:

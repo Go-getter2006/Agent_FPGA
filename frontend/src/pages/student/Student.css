@@ -30,3 +30,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 @media (max-width: 768px) {
   .problems-grid, .review-body, .home-grid { grid-template-columns: 1fr; }
 }
+
+.beginner-banner { margin-bottom: 16px; border-color: #C7D2FE; background: linear-gradient(90deg, #EEF2FF, #fff); }
+.beginner-banner .card-b { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.beginner-banner b { font-size: 15px; }
+.bb-actions { display: flex; gap: 8px; }

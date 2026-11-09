@@ -63,7 +63,7 @@ export default function Problems() {
           </div>
           <div className="card" style={{ marginTop: 16 }}><div className="card-h">各提示等级之后，下一次提交的通过率 <small>按提示词版本</small></div>
             <table className="tbl" data-testid="after-hint"><thead><tr><th>提示等级</th><th>提示词版本</th><th className="r">样本数</th><th className="r">下一次通过率</th></tr></thead>
-              <tbody>{q.data.after_hint.map((r: any) => <tr key={`${r.level}${r.prompt_version}`}><td>{r.level} 级</td><td>{r.prompt_version}</td><td className="r">{r.n}</td><td className="r">{pct(r.next_pass_rate)}</td></tr>)}</tbody></table>
+              <tbody>{q.data.after_hint.map((r: any) => <tr key={`${r.level}${r.prompt_version}`}><td>{r.level >= 4 ? '参考答案' : `${r.level} 级`}</td><td>{r.prompt_version}</td><td className="r">{r.n}</td><td className="r">{pct(r.next_pass_rate)}</td></tr>)}</tbody></table>
             {q.data.after_hint.length === 0 && <Empty title="还没有提示记录" />}</div>
         </>
       )}

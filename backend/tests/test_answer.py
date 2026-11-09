@@ -41,8 +41,8 @@ def test_level3_rejects_answer_line_full_module_and_long_code():
     assert not leak["ok"] and any("泄露答案" in r for r in leak["reasons"])
     module = validate_hint_v2(raw(code="module top_module();\nendmodule"), level=3, code_lines=30, ref_code=REF)
     assert not module["ok"]
-    long = validate_hint_v2(raw(code="\n".join(f"x{i} = ____;" for i in range(9))), level=3, code_lines=30, ref_code=REF)
-    assert any("超过 8 行" in r for r in long["reasons"])
+    long = validate_hint_v2(raw(code="\n".join(f"x{i} = ____;" for i in range(13))), level=3, code_lines=30, ref_code=REF)
+    assert any("超过 12 行" in r for r in long["reasons"])
     assert any("缺少 code" in r for r in validate_hint_v2(raw(code=""), level=3, code_lines=30)["reasons"])
     fenced = validate_hint_v2(raw(code="```verilog\nq <= ____;\n```"), level=3, code_lines=30, ref_code=REF)
     assert fenced["ok"] and fenced["hint"]["code"] == "q <= ____;"
@@ -53,6 +53,14 @@ def test_level1_code_is_dropped_and_prose_code_blocked():
     assert r["ok"] and r["hint"]["code"] == "" and r["warnings"]
     r = validate_hint_v2(raw(level=2, code="", message="改成：\n```\nx\n```"), level=2, code_lines=30)
     assert not r["ok"]
+
+
+def test_lines_written_in_spec_are_public():
+    ref = "assign y = a & b;\nalways @(posedge clk) led <= ~led;"
+    assert answer_lines(ref) == {"assigny=a&b;", "always@(posedgeclk)led<=~led;"}
+    spec = "翻转可以写成 `always @(posedge clk) led <= ~led;`"
+    assert answer_lines(ref, spec) == {"assigny=a&b;"}
+    assert chat_leak_reason("```\nalways @(posedge clk) led <= ~led;\n```", ref, False, spec) is None
 
 
 def test_chat_guard_relaxed_after_reveal():

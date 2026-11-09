@@ -1,7 +1,9 @@
-// 界面事件批量上报（docs/learner-model.md 第 7 节）：每 5 秒或满 20 条发一次；提交代码前先发完
+// 界面事件批量上报（docs/learner-model.md 第 7 节）：每 5 秒或满 20 条发一次；提交代码前先发完；
+// 关闭或离开页面时用 sendBeacon 把剩下的发出去（否则跳转页面时队列里的事件会丢）
 import { post } from '../api/client'
 
 export type ClientEventType = 'page.view' | 'step.enter' | 'problem.open' | 'waveform.view' | 'waveform.cell_click'
+  | 'lesson.open' | 'lesson.quiz' | 'tour.done'
 
 export interface ClientEvent {
   type: ClientEventType
@@ -20,7 +22,23 @@ export class EventReporter {
   constructor(private send: Sender, private maxBatch = 20, private intervalMs = 5000) {}
 
   start() {
-    if (this.timer === null) this.timer = setInterval(() => void this.flush(), this.intervalMs)
+    if (this.timer === null) {
+      this.timer = setInterval(() => void this.flush(), this.intervalMs)
+      if (typeof window !== 'undefined') {
+        window.addEventListener('pagehide', () => this.flushBeacon())
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.flushBeacon() })
+      }
+    }
+  }
+
+  /** 页面要关了：不等定时器，用 sendBeacon 发出去（浏览器保证在页面卸载后也会发送） */
+  flushBeacon(url = '/api/student/events') {
+    if (this.queue.length === 0 || typeof navigator === 'undefined' || !navigator.sendBeacon) return
+    while (this.queue.length) {
+      const batch = this.queue.splice(0, this.maxBatch)
+      const ok = navigator.sendBeacon(url, new Blob([JSON.stringify({ events: batch })], { type: 'application/json' }))
+      if (!ok) { this.queue.unshift(...batch); return }
+    }
   }
 
   stop() {

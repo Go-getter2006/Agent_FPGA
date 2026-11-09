@@ -85,3 +85,23 @@ describe('教师端平均用时显示', () => {
     expect(duration(5662)).toBe('3.9 天')
   })
 })
+
+describe('EventReporter.flushBeacon', () => {
+  it('离开页面时用 sendBeacon 发出队列里的事件；发送失败就留在队列里', () => {
+    const sent: string[] = []
+    const original = navigator.sendBeacon
+    Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: (_url: string, body: Blob) => { sent.push(String(body.size)); return true } })
+    const r = new EventReporter(async () => undefined, 20)
+    r.track('lesson.open', { payload: { lesson: 'a' } })
+    r.track('lesson.quiz', { payload: { lesson: 'a' } })
+    r.track('tour.done')
+    r.flushBeacon()
+    expect(sent).toHaveLength(1)          // 3 条一批发出
+    expect(r.pending()).toBe(0)
+    Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: () => false })
+    r.track('tour.done')
+    r.flushBeacon()
+    expect(r.pending()).toBe(1)
+    Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: original })
+  })
+})

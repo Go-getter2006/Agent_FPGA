@@ -89,11 +89,11 @@ def validate_hint(raw: str, *, level: int, code_lines: int, drivers: dict[str, l
 # ---------------------------------------------------------------- 第 2 版（4 级提示：思路 / 定位 / 代码提示 / 参考答案）
 # docs/llm-deepseek.md 5.3 节第 2 版：
 # - 1、2 级：沿用上面的规则，不给代码；message 里可以有 Markdown 的加粗和行内代码
-# - 3 级：code 字段可以给代码框架或小例子，最多 8 行；不能出现完整模块（module…endmodule），
+# - 3 级：code 字段可以给代码框架或小例子，最多 12 行；不能出现完整模块（module…endmodule），
 #   也不能原样写出参考答案里的“答案行”（含 = 的语句，去掉注释和空白后逐行比较；只赋常数的行如 q <= 0; 除外）
 # - 助教对话：学生看过参考答案之前，适用同样的“完整模块 / 答案行”规则，每个代码块最多 12 行
 
-MAX_CODE_LINES = 8
+MAX_CODE_LINES = 12
 MAX_CHAT_BLOCK_LINES = 12
 _CONST_ASSIGN = re.compile(r"^[A-Za-z_][\w$\[\]:]*<?=[0-9'bBhHdDoOxXzZ_]+;$")
 
@@ -102,21 +102,23 @@ def _norm(line: str) -> str:
     return re.sub(r"\s+", "", line.split("//", 1)[0].replace("`", ""))
 
 
-def answer_lines(ref_code: str) -> set[str]:
-    """参考答案里的“答案行”：去掉注释、空白后含 = 的语句；只给常数赋值的行（复位、默认值）不算。"""
+def answer_lines(ref_code: str, public_text: str | None = None) -> set[str]:
+    """参考答案里的“答案行”：去掉注释、空白后含 = 的语句；只给常数赋值的行（复位、默认值）不算，
+    题目说明里已经公开写出的语句（public_text，如“翻转可以写成 led <= ~led;”）也不算。"""
+    public = re.sub(r"\s+", "", (public_text or "").replace("`", ""))
     out = set()
     for ln in ref_code.splitlines():
         n = _norm(ln)
-        if "=" in n and len(n) >= 4 and not _CONST_ASSIGN.match(n):
+        if "=" in n and len(n) >= 4 and not _CONST_ASSIGN.match(n) and n not in public:
             out.add(n)
     return out
 
 
-def reveals_answer(text: str, ref_code: str | None) -> str | None:
+def reveals_answer(text: str, ref_code: str | None, public_text: str | None = None) -> str | None:
     if re.search(r"\bmodule\b", text) and re.search(r"\bendmodule\b", text):
         return "写出了完整的模块（module…endmodule）"
     if ref_code:
-        lines = answer_lines(ref_code)
+        lines = answer_lines(ref_code, public_text)
         for ln in text.splitlines():
             if _norm(ln) in lines:
                 return "原样写出了参考答案里的语句"
@@ -129,11 +131,12 @@ def _strip_fence(code: str) -> str:
     return m.group(1) if m else code
 
 
-def chat_leak_reason(text: str, ref_code: str | None, answer_revealed: bool) -> str | None:
+def chat_leak_reason(text: str, ref_code: str | None, answer_revealed: bool,
+                     public_text: str | None = None) -> str | None:
     """助教对话第 2 版：看过参考答案之后不限制；之前不能写出完整模块、答案行或过长的代码块。"""
     if answer_revealed:
         return None
-    reason = reveals_answer(text, ref_code)
+    reason = reveals_answer(text, ref_code, public_text)
     if reason:
         return reason
     for block in re.findall(r"```[^\n]*\n(.*?)(?:```|$)", text, re.S):
@@ -144,7 +147,7 @@ def chat_leak_reason(text: str, ref_code: str | None, answer_revealed: bool) -> 
 
 
 def validate_hint_v2(raw: str, *, level: int, code_lines: int, drivers: dict[str, list[int]] | None = None,
-                     ref_code: str | None = None) -> dict:
+                     ref_code: str | None = None, public_text: str | None = None) -> dict:
     """第 2 版分级提示的校验；返回格式与 validate_hint 相同，hint 多一个 code 字段。"""
     reasons: list[str] = []
     warnings: list[str] = []
@@ -184,7 +187,7 @@ def validate_hint_v2(raw: str, *, level: int, code_lines: int, drivers: dict[str
         n = len([ln for ln in code.splitlines() if ln.strip()])
         if n > MAX_CODE_LINES:
             reasons.append(f"code 有 {n} 行，超过 {MAX_CODE_LINES} 行")
-    reveal = reveals_answer(f"{prose}\n{code}", ref_code)
+    reveal = reveals_answer(f"{prose}\n{code}", ref_code, public_text)
     if reveal:
         reasons.append(f"泄露答案：{reveal}")
 

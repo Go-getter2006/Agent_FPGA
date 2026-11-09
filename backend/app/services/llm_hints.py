@@ -125,7 +125,7 @@ def generate_hint(db: DbSession, llm: LlmClient, *, attempt: Attempt, problem: P
             return fallback(result.reason or "error", result.call.id if result.call else None)
         last_call = result.call
         check = validate_hint_v2(result.content, level=level, code_lines=code_lines, drivers=drivers,
-                                 ref_code=problem.meta.get("ref_code"))
+                                 ref_code=problem.meta.get("ref_code"), public_text=problem.meta.get("spec"))
         last_call.validation = {"ok": check["ok"], "reasons": check["reasons"], "warnings": check["warnings"],
                                 "round": round_ + 1}
         if check["ok"]:

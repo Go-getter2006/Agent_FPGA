@@ -1,0 +1,15 @@
+id: b3_dff_en
+title: 入门 3：会记忆的寄存器（带使能的 D 触发器）
+knowledge_points: [sequential, reset]
+primm_type: predict
+difficulty: 1
+order: 3
+stage: beginner
+starter: starter.v
+predict_points:
+  - {signal: q, steps: [2, 3, 5, 7]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 1        # q 一位
+expected_drivers:
+  q: [11, 12]
+modify_goal: ""

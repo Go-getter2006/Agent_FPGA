@@ -49,6 +49,8 @@ export interface ProblemDetail {
   pending_prediction: { id: number; kind: 'waveform' | 'hardware'; answers: any; locked_at: string }[]
   latest_tb: TbSubmission | null
   flags: Record<string, boolean>
+  stage: string
+  answer: AnswerStatus
 }
 
 export interface CompileError { file: string | null; line: number | null; message: string }
@@ -85,8 +87,14 @@ export interface InvestigationStatus {
 export interface Hint {
   id: number; level: number; source: 'llm' | 'fallback'; created_at: string
   focus: { step: number | null; signal: string | null; lines: number[] }
-  message: string; question: string; concept_tags: string[]; tag?: string
+  message: string; question: string; concept_tags: string[]; tag?: string; code?: string
   fallback_reason?: string | null; prompt_version?: string; model?: string
+}
+
+/** 第 4 级提示“参考答案”的解锁状态（backend/app/services/answer.py） */
+export interface AnswerStatus {
+  available: boolean; unlocked: boolean; revealed: boolean; failed: number; fails_needed: number
+  code_hint_seen: boolean; message: string
 }
 
 export interface ChatMessage {
@@ -128,7 +136,7 @@ export interface HomeData {
 
 export interface ProblemListItem {
   id: string; title: string; primm_type: PrimmType; primm_label: string; difficulty: number
-  knowledge_points: KP[]; status: 'not_started' | 'in_progress' | 'passed' | 'mastered'; due_at: string | null
+  knowledge_points: KP[]; status: 'not_started' | 'in_progress' | 'passed' | 'mastered'; due_at: string | null; stage?: string
 }
 
 export interface ReportData {

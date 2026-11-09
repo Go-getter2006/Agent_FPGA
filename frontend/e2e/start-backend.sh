@@ -9,7 +9,7 @@ export ANON_SALT="e2e-salt"
 export JUDGE_LOG_PATH="$E2E_DIR/judge.jsonl"
 export DEMO_PASSWORD="${DEMO_PASSWORD:-e2e-pass-123}"
 export HINT_INTERVAL_SECONDS=1
-python3 -m backend.scripts.seed_demo --students 4
+python3 -m backend.scripts.seed_demo --students 6
 # 教师端：2 组 × 30 名虚拟学生 × 20 次尝试
 python3 -m backend.scripts.gen_test_data --teacher-login TGEN --teacher-password "$DEMO_PASSWORD"
 python3 -m backend.worker --workers 2 > "$E2E_DIR/worker.log" 2>&1 &

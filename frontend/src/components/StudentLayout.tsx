@@ -33,6 +33,7 @@ export default function StudentLayout() {
         <Brand />
         <nav aria-label="学生端导航">
           <NavLink to="/student" end>学习首页</NavLink>
+          <NavLink to="/student/learn" data-testid="nav-learn">新手入门</NavLink>
           <NavLink to="/student/problems">题目</NavLink>
           <NavLink to="/student/review">复习{due > 0 && <span className="chip blue nav-count">{due}</span>}</NavLink>
           <NavLink to="/student/report">我的学情</NavLink>

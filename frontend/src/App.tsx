@@ -13,6 +13,7 @@ import Home from './pages/student/Home'
 import Problems from './pages/student/Problems'
 import Report from './pages/student/Report'
 import Review from './pages/student/Review'
+import { LearnIndex, LessonPage } from './pages/student/Learn'
 import Workbench from './pages/student/Workbench'
 import Assignments from './pages/teacher/Assignments'
 import Heatmap from './pages/teacher/Heatmap'
@@ -63,6 +64,8 @@ export default function App() {
         <Route path="problems" element={<Problems />} />
         <Route path="report" element={<Report />} />
         <Route path="review" element={<Review />} />
+        <Route path="learn" element={<LearnIndex />} />
+        <Route path="learn/:id" element={<LessonPage />} />
       </Route>
       <Route path="/teacher" element={<Guard role="teacher"><TeacherIndex /></Guard>} />
       <Route path="/teacher/classes/:cid" element={<Guard role="teacher"><TeacherLayout /></Guard>}>
