@@ -68,12 +68,13 @@ def _parse_time(v: str | None) -> datetime | None:
     return t if t.tzinfo else t.replace(tzinfo=timezone(ta.timedelta(hours=8)))
 
 
-def _mask(rows, anonymous: bool, key: str = "name"):
-    """匿名时去掉真实姓名（递归处理列表与字典）。"""
+def _mask(rows, anonymous: bool):
+    """匿名时去掉学生的真实姓名：只处理带 alias（S01 这类代号）的学生记录，知识点、题目等的 name 不动。"""
     if isinstance(rows, list):
-        return [_mask(r, anonymous, key) for r in rows]
+        return [_mask(r, anonymous) for r in rows]
     if isinstance(rows, dict):
-        return {k: (None if anonymous and k == key else _mask(v, anonymous, key)) for k, v in rows.items()}
+        student = "alias" in rows
+        return {k: (None if anonymous and student and k == "name" else _mask(v, anonymous)) for k, v in rows.items()}
     return rows
 
 

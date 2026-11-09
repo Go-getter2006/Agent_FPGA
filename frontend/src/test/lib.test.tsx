@@ -74,3 +74,14 @@ describe('parseSse：解析流式对话', () => {
     expect(next.events).toEqual([{ done: true, source: 'llm' }])
   })
 })
+
+import { duration } from '../pages/teacher/Overview'
+
+describe('教师端平均用时显示', () => {
+  it('分钟、小时、天', () => {
+    expect(duration(null)).toBe('—')
+    expect(duration(26.4)).toBe('26 分钟')
+    expect(duration(150)).toBe('2.5 小时')
+    expect(duration(5662)).toBe('3.9 天')
+  })
+})

@@ -107,3 +107,10 @@
 - 新增表：`llm_calls`（字段同 docs/llm-deepseek.md 第 9 节，另有 `cost_cny`、`error`、`user_id`）、`chat_sessions`（每个学生每道题一个）、`chat_messages`（另有 `source`、`attempt_id`）
 - `GET /student/problems/{pid}/chat`：对话历史；`POST /student/problems/{pid}/chat`：SSE，事件为 `{"delta", "source"}` 若干条，最后一条 `{"done": true, "message_id", "source", "flagged"}`；超过每小时 30 条返回 429 `CHAT_LIMIT`
 - 提示接口返回的提示带 `source`（llm / fallback）、`fallback_reason`、`prompt_version`、`model`
+
+## 8. 阶段 5 实现补充
+- 新增表：`analysis_labels`（另有 `class_id`、`llm_call_id`、`sampled`、`created_at`）、`teacher_notes`
+- 教师端接口另有：`GET /teacher/status`（大模型可用性与当天费用，顶栏预算提示用）、`POST /teacher/classes/{cid}/anonymity`（关闭 / 打开匿名，写事件）、`GET /teacher/classes/{cid}/heatmap/cell`（热力图格子的最近尝试）、`GET /teacher/classes/{cid}/misconceptions/{code}`（误区详情）、`GET /teacher/attempts/{aid}`（尝试详情）、`GET /teacher/problems`（题库预览）、`GET /teacher/classes/{cid}/assignments`、`GET /teacher/classes/{cid}/groups`、`GET /teacher/classes/{cid}/analysis/icap`（编码汇总与 κ）、`GET /teacher/classes/{cid}/roster`、`POST /teacher/students/{uid}/reset_password`
+- 越权：教师访问其他教师的班级或学生返回 403；导出文件只有发起导出的教师能下载；admin 可以访问全部
+- 名单导入：CSV 每行“学号,姓名[,分组]”；新账号生成临时密码，只在导入结果里出现一次
+- 测试数据：`python -m backend.scripts.gen_test_data` 生成 2 组 × 30 名虚拟学生 × 20 次尝试（裁判结果来自对参考答案、起始代码和错误样本的真实诊断）

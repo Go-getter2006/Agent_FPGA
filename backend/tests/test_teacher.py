@@ -264,6 +264,8 @@ def test_heatmap_levels_match_sql(gen):
     cid = gen["class_id"]
     data = gen["client"].get(f"/api/teacher/classes/{cid}/heatmap").json()
     assert len(data["rows"]) == 60 and len(data["knowledge_points"]) == 11
+    assert all(k["name"] for k in data["knowledge_points"])          # 匿名只去掉学生姓名
+    assert all(r["name"] is None and r["alias"].startswith("S") for r in data["rows"])
     rows = sql(f"""
         WITH ak AS (
           SELECT a.id, a.user_id, j.value AS kp, a.created_at, a.sim_ok, a.quadrant,

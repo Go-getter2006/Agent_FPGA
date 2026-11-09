@@ -14,7 +14,15 @@ import Problems from './pages/student/Problems'
 import Report from './pages/student/Report'
 import Review from './pages/student/Review'
 import Workbench from './pages/student/Workbench'
-import TeacherHome from './pages/teacher/TeacherHome'
+import Assignments from './pages/teacher/Assignments'
+import Heatmap from './pages/teacher/Heatmap'
+import Misconceptions from './pages/teacher/Misconceptions'
+import Overview from './pages/teacher/Overview'
+import TProblems from './pages/teacher/Problems'
+import Research from './pages/teacher/Research'
+import Roster from './pages/teacher/Roster'
+import Students from './pages/teacher/Students'
+import TeacherLayout, { TeacherIndex } from './pages/teacher/TeacherLayout'
 
 function Guard({ role, children, consentPage = false }: { role: 'student' | 'teacher'; children: ReactNode; consentPage?: boolean }) {
   const me = useMe()
@@ -56,7 +64,20 @@ export default function App() {
         <Route path="report" element={<Report />} />
         <Route path="review" element={<Review />} />
       </Route>
-      <Route path="/teacher/*" element={<Guard role="teacher"><TeacherHome /></Guard>} />
+      <Route path="/teacher" element={<Guard role="teacher"><TeacherIndex /></Guard>} />
+      <Route path="/teacher/classes/:cid" element={<Guard role="teacher"><TeacherLayout /></Guard>}>
+        <Route index element={<Overview />} />
+        <Route path="heatmap" element={<Heatmap />} />
+        <Route path="misconceptions" element={<Misconceptions />} />
+        <Route path="problems" element={<TProblems />} />
+        <Route path="problems/:pid" element={<TProblems />} />
+        <Route path="students" element={<Students />} />
+        <Route path="students/:uid" element={<Students />} />
+        <Route path="assignments" element={<Assignments />} />
+        <Route path="research" element={<Research />} />
+        <Route path="roster" element={<Roster />} />
+      </Route>
+      <Route path="/teacher/*" element={<Navigate to="/teacher" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

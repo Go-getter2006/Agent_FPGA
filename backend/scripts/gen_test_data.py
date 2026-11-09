@@ -105,7 +105,8 @@ def fake_prediction(rng: random.Random, problem: Problem, diag: dict, skill: flo
 
 
 def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, weeks: int = 8,
-             now: datetime | None = None, problems_dir: Path | None = None, create_tables: bool = True) -> dict:
+             now: datetime | None = None, problems_dir: Path | None = None, create_tables: bool = True,
+             teacher_login: str | None = None, teacher_password: str = "generated-teacher") -> dict:
     rng = random.Random(seed)
     now = now or utcnow()
     problems_dir = problems_dir or get_settings().problems_dir
@@ -117,8 +118,8 @@ def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, wee
         sync_all(db)
         problems = {p.id: p for p in db.scalars(select(Problem)).all()}
         tag = hashlib.sha1(f"{seed}{now.isoformat()}".encode()).hexdigest()[:6]
-        teacher = User(login_name=f"TG{tag}", display_name="生成数据教师", role="teacher",
-                       password_hash=hash_password("generated-teacher"))
+        teacher = User(login_name=teacher_login or f"TG{tag}", display_name="生成数据教师", role="teacher",
+                       password_hash=hash_password(teacher_password))
         db.add(teacher)
         db.flush()
         cls = Class(name=f"测试班级（生成 {tag}）", term="2026 秋", teacher_id=teacher.id)
@@ -299,15 +300,17 @@ def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, wee
                 done = (p.primm_type == "predict" and st["investigated"]) or st["modify_done"] or st["tb_done"]
                 db.add(Progress(user_id=u.id, problem_id=pid, step="done" if done else "predict", state=st))
         db.commit()
-        return {"class_id": cls.id, "teacher_login": teacher.login_name, "teacher_password": "generated-teacher",
+        return {"class_id": cls.id, "teacher_login": teacher.login_name, "teacher_password": teacher_password,
                 "students": len(students), **counts}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=2026)
+    ap.add_argument("--teacher-login", default=None)
+    ap.add_argument("--teacher-password", default="generated-teacher")
     args = ap.parse_args()
-    info = generate(seed=args.seed)
+    info = generate(seed=args.seed, teacher_login=args.teacher_login, teacher_password=args.teacher_password)
     print(info)
 
 
