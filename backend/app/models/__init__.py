@@ -250,6 +250,50 @@ class Job(Base):
     finished_at = mapped_column(UTCDateTime, nullable=True)
 
 
+class LlmCall(Base):
+    """大模型调用日志（docs/llm-deepseek.md 第 9 节）。完整 messages 仅供研究复现，只在内部可见；不记录 API Key。"""
+    __tablename__ = "llm_calls"
+    __table_args__ = (Index("ix_llm_calls_ts", "ts"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ts = mapped_column(UTCDateTime, default=utcnow)
+    purpose: Mapped[str] = mapped_column(String(32))            # hint / chat / icap / weekly_report / eval_hint
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)   # 响应里的 model 字段
+    request_hash: Mapped[str] = mapped_column(String(64))
+    messages: Mapped[list] = mapped_column(JSON)
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tokens: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(16))             # ok / error / invalid / blocked
+    validation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    retries: Mapped[int] = mapped_column(Integer, default=0)
+    cost_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    __table_args__ = (UniqueConstraint("user_id", "problem_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    problem_id: Mapped[str] = mapped_column(ForeignKey("problems.id"))
+    created_at = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(16))               # user / assistant
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(String(16), nullable=True)   # llm / fallback（助教消息）
+    attempt_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_call_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    flagged: Mapped[bool] = mapped_column(Boolean, default=False)          # 触发了泄露代码拦截
+    created_at = mapped_column(UTCDateTime, default=utcnow)
+
+
 class AppendOnlyError(RuntimeError):
     pass
 

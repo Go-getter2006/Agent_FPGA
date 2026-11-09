@@ -263,3 +263,23 @@ test('修改题：顺序打乱实验揭示竞争，再进入修改步骤', async
   await expect(page.locator('.steps li.cur')).toContainText('修改')
   await expect(page.getByTestId('task-card')).toContainText('修改目标')
 })
+
+test('大模型不可用时：提示和对话都换成简化提示，照常做题', async ({ page }) => {
+  // 端到端测试的后端没有配置 DEEPSEEK_API_KEY，相当于断网 / Key 无效
+  await login(page, 'S2026001')
+  await page.getByTestId('consent-accept').click()
+  await page.waitForURL('**/student')
+  await page.goto(`/student/problems/${PID}`)
+  await setEditor(page, caseCode('c1_no_overlap.v'))
+  await predict(page, { 3: '1', 4: '0', 5: '1', 15: '0' }, { ff: 2, ffSignals: ['state'] })
+  await page.getByTestId('btn-lock').click()
+  await page.getByTestId('btn-run').click()
+  await expect(page.getByTestId('first-mismatch')).toBeVisible({ timeout: 60_000 })   // 仿真照常
+  await page.getByTestId('hint-request').click()
+  await expect(page.getByTestId('hint-1')).toContainText('第 5 步')
+  await expect(page.getByTestId('hint-source')).toHaveText('当前为简化提示，不影响仿真和判定')
+  await page.getByTestId('chat-input').fill('第 5 步为什么对不上？')
+  await page.getByTestId('chat-send').click()
+  await expect(page.getByTestId('chat-reply').last()).toContainText('当前为简化提示')
+  await expect(page.getByTestId('chat-panel').locator('.card-h small')).toHaveText('当前为简化提示，不影响仿真和判定')
+})

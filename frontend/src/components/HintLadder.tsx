@@ -38,7 +38,20 @@ export default function HintLadder({ hints, onRequest, loading, error, disabled 
           </div>
         )
       })}
-      <div className="lock">当前为规则提示：由仿真和综合结果生成，不会直接给出代码</div>
+      <HintSourceNote hints={hints} />
     </div>
   )
+}
+
+// 大模型不可用时：“当前为简化提示，不影响仿真和判定”（docs/ui-design.md 第 7 节）
+const UNAVAILABLE = new Set(['no_key', 'breaker_open', 'budget', 'error', 'invalid'])
+
+function HintSourceNote({ hints }: { hints: Hint[] }) {
+  const last = hints[hints.length - 1]
+  if (!last) return <div className="lock">提示依据仿真和综合结果生成，不会直接给出代码</div>
+  if (last.source === 'llm') return <div className="lock" data-testid="hint-source">由 DeepSeek 根据仿真结果生成，不会直接给出代码</div>
+  if (last.fallback_reason && UNAVAILABLE.has(last.fallback_reason)) {
+    return <div className="lock warn" data-testid="hint-source">当前为简化提示，不影响仿真和判定</div>
+  }
+  return <div className="lock" data-testid="hint-source">规则提示：由仿真和综合结果生成，不会直接给出代码</div>
 }

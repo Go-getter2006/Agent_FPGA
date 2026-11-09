@@ -62,3 +62,15 @@ describe('format', () => {
     expect(binToHex('1x10')).toBe('1X10')
   })
 })
+
+import { parseSse } from '../components/ChatPanel'
+
+describe('parseSse：解析流式对话', () => {
+  it('完整事件与半截事件', () => {
+    const { events, rest } = parseSse('data: {"delta":"你好"}\n\ndata: {"delta":"，第 5 步"}\n\ndata: {"do')
+    expect(events.map((e) => e.delta)).toEqual(['你好', '，第 5 步'])
+    expect(rest).toBe('data: {"do')
+    const next = parseSse(rest + 'ne":true,"source":"llm"}\n\n')
+    expect(next.events).toEqual([{ done: true, source: 'llm' }])
+  })
+})

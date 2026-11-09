@@ -401,7 +401,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                   : <div className="muted">运行一次之后可以要提示。</div>}
               </div>
             </div>
-            <ChatPanel />
+            <ChatPanel problemId={p.id} attemptId={a?.id ?? null} enabled={p.flags.chat} />
           </>}
         </aside>
       </div>

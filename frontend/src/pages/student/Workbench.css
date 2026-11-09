@@ -82,10 +82,13 @@
 .ladder .lv p { font-size: 13px; margin-top: 6px; color: #374151; }
 .ladder .lv .q { margin-top: 6px; font-size: 13px; color: var(--c-primary); font-weight: 600; }
 .ladder .lock { color: var(--c-text-2); font-weight: 400; font-size: 12px; }
+.ladder .lock.warn { color: var(--c-warning); }
 .chat { display: flex; flex-direction: column; flex: 1; min-height: 220px; }
 .msgs { flex: 1; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
 .msg { max-width: 88%; padding: 8px 12px; border-radius: 10px; font-size: 13px; }
-.msg.ai { align-self: flex-start; background: #F3F4F6; border-bottom-left-radius: 3px; }
+.msg.ai { align-self: flex-start; background: #F3F4F6; border-bottom-left-radius: 3px; white-space: pre-wrap; }
+.msg.me { align-self: flex-end; background: var(--c-primary); color: #fff; border-bottom-right-radius: 3px; white-space: pre-wrap; }
+.msg.notice { align-self: center; background: transparent; color: var(--c-text-2); font-size: 12px; }
 .chat-in { border-top: 1px solid var(--c-border); padding: 10px 12px; }
 .chat-in .tip { font-size: 11px; color: var(--c-text-2); margin-bottom: 6px; }
 .chat-in .box { display: flex; gap: 8px; }

@@ -102,3 +102,8 @@
 - 预测题、修改题在进入修改阶段之前，`POST .../attempts` 运行的一律是起始代码
 - 事件：前端只能上报 `page.view`、`step.enter`、`problem.open`、`waveform.view`、`waveform.cell_click`；其余事件由后端在对应操作里写入
 - 任务：测试时设 `JOBS_INLINE=1`，任务在请求里同步执行；正常运行用 `python -m backend.worker`
+
+## 7. 阶段 4 实现补充
+- 新增表：`llm_calls`（字段同 docs/llm-deepseek.md 第 9 节，另有 `cost_cny`、`error`、`user_id`）、`chat_sessions`（每个学生每道题一个）、`chat_messages`（另有 `source`、`attempt_id`）
+- `GET /student/problems/{pid}/chat`：对话历史；`POST /student/problems/{pid}/chat`：SSE，事件为 `{"delta", "source"}` 若干条，最后一条 `{"done": true, "message_id", "source", "flagged"}`；超过每小时 30 条返回 429 `CHAT_LIMIT`
+- 提示接口返回的提示带 `source`（llm / fallback）、`fallback_reason`、`prompt_version`、`model`

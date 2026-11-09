@@ -4,16 +4,18 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..models import (Assignment, Attempt, Event, Explanation, Hint, Investigation, KnowledgePoint,
+from ..models import (Assignment, Attempt, ChatMessage, Event, Explanation, Hint, Investigation, KnowledgePoint,
                       Prediction, Problem, Progress, ReviewItem, ShuffleRun, TbSubmission, User)
-from ..services import fallback_hints, jobs, review_scheduler, workflow
+from ..services import chat, jobs, llm_hints, review_scheduler, workflow
+from ..services.llm import get_llm
 from ..services.events import CLIENT_EVENT_TYPES, log_event, primary_enrollment
 from ..services.flags import flags_for_user
 from ..services.learner_model import MISCONCEPTION_LABELS, normalize_value
@@ -456,16 +458,66 @@ def request_hint(aid: int, user: User = Depends(student_user), db: DbSession = D
     run = db.scalar(select(ShuffleRun).where(ShuffleRun.attempt_id == a.id, ShuffleRun.status == "done")
                     .order_by(ShuffleRun.id.desc()))
     p = _problem(db, a.problem_id)
-    content = fallback_hints.generate(a.judge or {}, level, evaluation=(a.analysis or {}).get("evaluation"),
-                                      quadrant=a.quadrant, shuffle=run.result if run else None,
-                                      problem_kps=p.knowledge_points)
-    hint = Hint(attempt_id=a.id, level=level, source="fallback", content=content)
+    db.flush()
+    # 大模型分级提示；关闭、不可用、校验不通过时降级为规则提示（docs/llm-deepseek.md 第 5、7 节）
+    out = llm_hints.generate_hint(db, get_llm(), attempt=a, problem=p, level=level,
+                                  llm_enabled=flags_for_user(db, user)["llm_hints"],
+                                  shuffle=run.result if run else None)
+    content = {**out["content"], "fallback_reason": out["fallback_reason"]}
+    hint = Hint(attempt_id=a.id, level=level, source=out["source"], content=content, llm_call_id=out["llm_call_id"])
     db.add(hint)
     db.flush()
     log_event(db, user, "hint.shown", problem_id=a.problem_id, attempt_id=a.id,
-              payload={"attempt_id": a.id, "level": level, "source": "fallback", "hint_id": hint.id})
+              payload={"attempt_id": a.id, "level": level, "source": out["source"], "hint_id": hint.id,
+                       "prompt_version": content.get("prompt_version") or "fallback_v1",
+                       "fallback_reason": out["fallback_reason"]})
     db.commit()
     return _hint_payload(hint)
+
+
+# ---------------------------------------------------------------- 助教对话（SSE）
+
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+    attempt_id: int | None = None
+
+
+@router.get("/problems/{pid}/chat")
+def chat_history(pid: str, user: User = Depends(student_user), db: DbSession = Depends(get_db)):
+    p = _problem(db, pid)
+    session = chat.get_session(db, user.id, p.id)
+    db.commit()
+    return {"session_id": session.id, "enabled": flags_for_user(db, user)["chat"],
+            "messages": [{"id": m.id, "role": m.role, "content": m.content, "source": m.source,
+                          "flagged": m.flagged, "created_at": m.created_at} for m in chat.history(db, session)]}
+
+
+@router.post("/problems/{pid}/chat")
+def chat_send(pid: str, body: ChatIn, user: User = Depends(student_user), db: DbSession = Depends(get_db)):
+    p = _problem(db, pid)
+    _require_flag(flags_for_user(db, user), "chat", "助教对话")
+    if chat.sent_last_hour(db, user.id) >= get_settings().chat_hourly_limit:
+        raise ApiError(429, "CHAT_LIMIT", chat.RATE_LIMITED)
+    attempt_id = body.attempt_id
+    if attempt_id is not None:
+        a = db.get(Attempt, attempt_id)
+        if a is None or a.user_id != user.id or a.problem_id != pid:
+            attempt_id = None
+    if attempt_id is None:
+        latest = _latest_attempt(db, user.id, pid)
+        attempt_id = latest.id if latest else None
+    session = chat.get_session(db, user.id, p.id)
+    text = body.message.strip()
+    msg = ChatMessage(session_id=session.id, role="user", content=text, attempt_id=attempt_id)
+    db.add(msg)
+    db.flush()
+    log_event(db, user, "chat.send", problem_id=pid, attempt_id=attempt_id,
+              payload={"session_id": session.id, "length": len(text)})
+    db.commit()
+    gen = chat.stream_reply(get_llm(), user_id=user.id, session_id=session.id, message_id=msg.id,
+                            attempt_id=attempt_id)
+    return StreamingResponse(gen, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------- 顺序打乱实验

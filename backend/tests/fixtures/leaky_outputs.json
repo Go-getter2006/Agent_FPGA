@@ -1,0 +1,111 @@
+{
+ "leaky": [
+  {
+   "name": "代码块",
+   "message": "可以这样写：\n```verilog\nassign out = (state == S101);\n```",
+   "question": "试试看？"
+  },
+  {
+   "name": "代码块（无语言）",
+   "message": "参考 ``` always @(posedge clk) state <= next_state; ```",
+   "question": "明白了吗？"
+  },
+  {
+   "name": "完整模块",
+   "message": "module top_module(input clk, output out); assign out = 1; endmodule",
+   "question": "看懂了吗？"
+  },
+  {
+   "name": "两行时序赋值",
+   "message": "把这两行换成：\nstate <= next_state;\nout <= in;",
+   "question": "再试一次？"
+  },
+  {
+   "name": "两行 assign",
+   "message": "改成：\nassign sum = a + b + cin;\nassign cout = 1'b0;",
+   "question": "对吗？"
+  },
+  {
+   "name": "always + if",
+   "message": "写成\nalways @(*) begin\nif (in[3]) pos = 2'd3;",
+   "question": "能补全吗？"
+  },
+  {
+   "name": "reg + wire 声明",
+   "message": "先声明\nreg [1:0] state;\nwire next;",
+   "question": "然后呢？"
+  },
+  {
+   "name": "case 结构",
+   "message": "用\ncase (state)\nS0: next_state = S1;",
+   "question": "继续？"
+  },
+  {
+   "name": "非阻塞两行（缩进）",
+   "message": "提示：\n    q[1] <= q[0];\n    q[2] <= q[1];",
+   "question": "这样对吗？"
+  },
+  {
+   "name": "代码写在 question 里",
+   "message": "看第 12 行。",
+   "question": "如果写成\nalways @(posedge clk)\nq <= d; 会怎样？"
+  },
+  {
+   "name": "混合中文的两行代码",
+   "message": "第一行 assign y = a & b; 第二行\nassign z = a | b;\nassign w = ~a;",
+   "question": "懂了吗？"
+  },
+  {
+   "name": "if / else 两行",
+   "message": "改为：\nif (rst) count <= 0;\nelse count <= count + 1;",
+   "question": "这样呢？"
+  },
+  {
+   "name": "endmodule 与 module 分在两段",
+   "message": "开头写 module top_module",
+   "question": "结尾别忘了 endmodule，对吗？"
+  },
+  {
+   "name": "三重反引号无换行",
+   "message": "```assign out = state == 3;```",
+   "question": "试试？"
+  },
+  {
+   "name": "wire 声明 + assign",
+   "message": "加上\nwire [4:0] total;\nassign {cout, sum} = total;",
+   "question": "明白吗？"
+  }
+ ],
+ "clean": [
+  {
+   "name": "定位提示",
+   "message": "先看第 5 步的 out：期望 1，实际 0。out 由第 17 行决定。",
+   "question": "这一行在这个时钟沿做了什么？"
+  },
+  {
+   "name": "引用学生的一行",
+   "message": "第 17 行写的是 assign out = (state == S101); 它只看当前状态。",
+   "question": "第 5 步之前 state 是什么？"
+  },
+  {
+   "name": "概念提示",
+   "message": "非阻塞赋值在同一个时钟沿先读旧值、再统一更新。",
+   "question": "你的移位寄存器里，每一位读到的是旧值还是新值？"
+  },
+  {
+   "name": "类比",
+   "message": "就像排队传话，大家先记下听到的，再一起改口。",
+   "question": "你的代码里谁先改了口？"
+  },
+  {
+   "name": "提到 module 一词",
+   "message": "顶层 module 的名字要叫 top_module。",
+   "question": "你的模块名对吗？"
+  },
+  {
+   "name": "提到 <= 符号",
+   "message": "时序块里用 <= 赋值，组合块里用 =。",
+   "question": "第 12 行用的是哪一个？"
+  }
+ ]
+}

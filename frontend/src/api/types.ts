@@ -86,6 +86,12 @@ export interface Hint {
   id: number; level: number; source: 'llm' | 'fallback'; created_at: string
   focus: { step: number | null; signal: string | null; lines: number[] }
   message: string; question: string; concept_tags: string[]; tag?: string
+  fallback_reason?: string | null; prompt_version?: string; model?: string
+}
+
+export interface ChatMessage {
+  id: number | string; role: 'user' | 'assistant' | 'notice'; content: string
+  source?: 'llm' | 'fallback' | null; flagged?: boolean; created_at?: string
 }
 
 export interface ShuffleResult {
