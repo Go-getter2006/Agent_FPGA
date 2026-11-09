@@ -1,7 +1,7 @@
 # 后端接口与判题进程共用的镜像。用 Ubuntu 24.04，iverilog / yosys / verilator 版本与开发环境一致，判题结果相同
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-# 国内服务器可在 .env 里设镜像源加速（见 docs/deploy.md），不设就用官方源
+# 国内服务器可在 .env 里设镜像源加速（见 docs/deploy.md），不设就用官方源。APT_MIRROR 要用 http 地址：此时镜像里还没有 CA 证书
 ARG APT_MIRROR=
 ARG PIP_INDEX_URL=https://pypi.org/simple
 RUN if [ -n "$APT_MIRROR" ]; then \
