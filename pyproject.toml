@@ -9,5 +9,5 @@ dependencies = ["PyYAML>=6.0"]
 test = ["pytest>=8"]
 
 [tool.pytest.ini_options]
-testpaths = ["judge/tests"]
+testpaths = ["judge/tests", "backend/tests"]
 pythonpath = ["."]

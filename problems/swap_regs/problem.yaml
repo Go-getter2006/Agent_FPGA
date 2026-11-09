@@ -1,0 +1,15 @@
+id: swap_regs
+title: 两个寄存器互换
+knowledge_points: [parallel, blocking, sequential]
+primm_type: modify
+difficulty: 2
+starter: starter.v
+predict_points:
+  - {signal: x, steps: [2, 3]}
+  - {signal: y, steps: [2, 3]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 8        # x、y 各四位
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  x: [13, 14, 15]
+  y: [19, 20, 21]
+modify_goal: "让 x、y 在同一个时钟沿真正互换，并且结果不依赖两个 always 块的先后顺序"
