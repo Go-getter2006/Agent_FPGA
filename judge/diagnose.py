@@ -1,15 +1,14 @@
 """诊断流程（docs/judge.md 第 5 节）。"""
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config
 from .lint import run_lint
+from .log import append_log
 from .problem import JudgeError, Problem, load_problem
 from .sim import compile_design, simulate
 from .synth import has_multi_driver, hardware_stats, null_hardware, synth_check
@@ -112,26 +111,8 @@ def diagnose(
         "tags": tags,
     }
     if log:
-        append_log(result, student)
+        append_log({"type": "diagnose", "problem": problem.id, "student": student, "diagnosis": result})
     return result
-
-
-def append_log(result: dict, student: str | None, path: Path | None = None) -> None:
-    path = Path(path) if path else config.log_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "problem": result["problem"],
-        "student": student,
-        "diagnosis": result,
-    }
-    line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
-    with path.open("a", encoding="utf-8") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)     # 多个 worker 同时写时不互相穿插
-        try:
-            f.write(line)
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def to_json(result: dict) -> str:

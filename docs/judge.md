@@ -157,4 +157,12 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
 6. **multi_driven**：yosys 综合日志中出现 “multiple conflicting drivers”，或 verilator 报 MULTIDRIVEN
 7. **错误样本**：除 fragile_pass 外，每个样本都必须让题目自带的 tb 仿真失败（9.3 节自带 tb 得分 1.0 的前提）。只触发 blocking_in_seq / nonblocking_in_comb、仿真却正确的写法不放进 `cases/`，放在 `judge/tests/fixtures/` 里测试
 8. **内部信号**：problem.yaml 暂时没有字段标记“仅供观察、不参与比较”的信号，现有题目的 tb 都不打印内部信号
-9. **日志**：`logs/judge.jsonl` 每行 `{ts, problem, student, diagnosis}`，路径可用环境变量 `JUDGE_LOG_PATH` 覆盖；题目目录可用 `JUDGE_PROBLEMS_DIR` 覆盖
+9. **日志**：`logs/judge.jsonl` 每行 `{ts, type, problem, student, diagnosis}`（testbench 打分记录用 `result` 代替 `diagnosis`），路径可用环境变量 `JUDGE_LOG_PATH` 覆盖；题目目录可用 `JUDGE_PROBLEMS_DIR` 覆盖
+10. **testbench 打分**（9.3 节）：
+    - 命令行：`python -m judge <学生tb.v> <题目ID> --testbench`
+    - 学生 tb 的模块名不限，由 iverilog 自动找顶层；源码里（去掉注释后）必须有 `top_module` 的实例
+    - 输出在 9.3 节字段之外补充 `message`（失败时的中文说明，成功时为 null）和 `errors`（tb 编译报错，格式同 `compile.errors`）；失败时 `score` 为 null
+    - 错误样本在学生 tb 下编译失败、仿真超时或轨迹与参考答案不同，都算“抓住”
+    - `score` 保留 4 位小数；可计入的样本数为 0 时为 null
+    - 所有仿真都带 `vvp -none`，tb 里的 `$dumpvars` 不会写波形文件
+11. **日志记录类型**：`logs/judge.jsonl` 每行带 `type`（`diagnose` / `score_testbench`）

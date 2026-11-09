@@ -1,4 +1,7 @@
-"""命令行：python -m judge <学生代码.v> <题目ID> [--student <匿名ID>]"""
+"""命令行：
+    python -m judge <学生代码.v> <题目ID> [--student <匿名ID>]
+    python -m judge <学生testbench.v> <题目ID> --testbench     # testbench 打分
+"""
 from __future__ import annotations
 
 import argparse
@@ -7,6 +10,7 @@ from pathlib import Path
 
 from . import config
 from .diagnose import diagnose, to_json
+from .testbench import score_testbench
 from .problem import JudgeError
 from .runner import ToolNotFound
 
@@ -28,13 +32,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--problems-dir", type=Path, default=None, help="题目目录（默认 problems/）")
     parser.add_argument("--timeout", type=float, default=config.DEFAULT_TIMEOUT, help="每个外部命令的超时秒数")
     parser.add_argument("--no-log", action="store_true", help="不写 logs/judge.jsonl")
+    parser.add_argument("--testbench", action="store_true", help="把文件当作学生的 testbench，给它打分")
     args = parser.parse_args(argv)
 
     if not args.code.is_file():
         print(f"找不到学生代码文件：{args.code}", file=sys.stderr)
         return 2
     try:
-        result = diagnose(
+        run = score_testbench if args.testbench else diagnose
+        result = run(
             _read_code(args.code), args.problem,
             student=args.student, problems_dir=args.problems_dir,
             timeout=args.timeout, log=not args.no_log,

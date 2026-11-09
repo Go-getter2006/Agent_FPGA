@@ -38,9 +38,23 @@ def parse_compile_errors(result: CmdResult) -> list[dict]:
     return errors
 
 
-def compile_design(workdir: Path, design_file: str, out_name: str, timeout: float) -> tuple[dict, str | None]:
-    """编译 testbench + 设计文件。返回 (compile 字段, vvp 文件名或 None)。"""
-    cmd = ["iverilog", "-g2005", "-s", config.TB_TOP, "-o", out_name, config.TB_FILE, design_file]
+def compile_design(
+    workdir: Path,
+    design_file: str,
+    out_name: str,
+    timeout: float,
+    *,
+    tb_file: str = config.TB_FILE,
+    tb_top: str | None = config.TB_TOP,
+) -> tuple[dict, str | None]:
+    """编译 testbench + 设计文件。返回 (compile 字段, vvp 文件名或 None)。
+
+    tb_top 为 None 时由 iverilog 自动找顶层（学生自己写的 testbench 模块名不固定）。
+    """
+    cmd = ["iverilog", "-g2005"]
+    if tb_top:
+        cmd += ["-s", tb_top]
+    cmd += ["-o", out_name, tb_file, design_file]
     result = run(cmd, workdir, timeout)
     if result.ok:
         return {"ok": True, "errors": []}, out_name
@@ -49,7 +63,8 @@ def compile_design(workdir: Path, design_file: str, out_name: str, timeout: floa
 
 def simulate(workdir: Path, vvp_file: str, timeout: float) -> tuple[list[dict], bool]:
     """运行仿真，返回 (轨迹, 是否超时)。超时时轨迹为空。"""
-    result = run(["vvp", "-n", vvp_file], workdir, timeout)
+    # -none：不写波形文件（testbench 里的 $dumpvars 不会占用磁盘）
+    result = run(["vvp", "-n", vvp_file, "-none"], workdir, timeout)
     if result.timeout:
         return [], True
     return parse_trace(result.stdout), False
