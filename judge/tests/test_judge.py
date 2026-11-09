@@ -12,6 +12,7 @@ import pytest
 from judge import JudgeError, diagnose
 from judge.config import REPO_ROOT
 from judge.sim import parse_compile_errors
+from judge.tags import lint_tag
 from judge.runner import CmdResult
 from judge.trace import first_mismatch, parse_trace
 
@@ -69,6 +70,28 @@ def test_compile_error_parsing_drops_warnings():
 
 
 # ---------- 标签 ----------
+
+def _lint(code, message):
+    return {"code": code, "line": 1, "message": message}
+
+
+def test_widthexpand_of_one_bit_operand_is_not_a_tag():
+    # a + b + cin：1 位的 cin 被扩展，教材标准写法，不算误区
+    item = _lint("WIDTHEXPAND", "Operator ADD expects 5 bits on the RHS, but RHS's VARREF 'cin' generates 1 bits.")
+    assert lint_tag(item) is None
+
+
+def test_widthexpand_of_multibit_operand_is_a_tag():
+    item = _lint("WIDTHEXPAND", "Operator EQ expects 4 bits on the LHS, but LHS's VARREF 'cnt' generates 3 bits.")
+    assert lint_tag(item) == "width_mismatch"
+
+
+def test_other_lint_mappings():
+    assert lint_tag(_lint("WIDTHTRUNC", "... generates 1 bits.")) == "width_mismatch"
+    assert lint_tag(_lint("BLKSEQ", "Blocking assignment '=' in sequential logic process")) == "blocking_in_seq"
+    assert lint_tag(_lint("COMBDLY", "Non-blocking assignment '<=' in combinational logic process")) == "nonblocking_in_comb"
+    assert lint_tag(_lint("UNUSEDSIGNAL", "Signal is not used: 'rst'")) is None
+
 
 def test_lint_tags_blocking_and_nonblocking():
     result = diagnose((FIXTURES / "blk_nonblk.v").read_text(encoding="utf-8"), PID, log=False)

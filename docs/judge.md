@@ -142,3 +142,19 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
  "caught": ["c1_latch.v", "c4_width.v"], "missed": ["c3_reset.v"], "excluded": ["c2_fragile.v"]}
 ```
 - 验收：把题目自带的 tb.v 当作“学生 tb”提交时，得分必须为 1.0。这同时检验题目质量：自带 tb 必须能抓住所有可抓的样本
+
+## 10. 实现约定（阶段 1 定下，后续阶段沿用）
+1. **语言标准**：三个工具都按 Verilog-2005（iverilog `-g2005`、yosys 默认、verilator `--default-language 1364-2005`）。tb 的顶层模块名固定为 `tb`，编译时用 `-s tb`
+2. **JSON 补充字段**（只增不改）：
+   - `compile.errors` 每项为 `{file, line, message}`，`file` 区分报错在 `student.v` 还是 `tb.v`
+   - `synth.timeout`：综合超时时为 true，此时不打 non_synthesizable
+   - 编译失败时：`sim.trace` 为空，`synth.ok` 为 null（未运行），`hardware` 各字段为 null，`lint` 为空，标签只有 compile_error
+3. **仿真超时**：轨迹为空、`first_mismatch` 为 null、`sim.timeout` 为 true，并打 sim_mismatch（不新增标签；前端据 timeout 提示“可能有组合环路或死循环”）
+4. **触发器信号与个数**：
+   - `ff_signals` / `latch_signals`：`proc; flatten; opt_clean` 之后读 RTLIL 中触发器 / 锁存器单元 Q 端连接的信号名。加 `opt_clean` 是为了去掉输出没人用的单元，否则 for 循环变量、块内临时变量也会被算成触发器
+   - `ff_count` / `lut_count`：`synth_xilinx -flatten -nosrl` 之后 `stat`。综合前给所有信号加 `fsm_encoding="none"`，不让 yosys 把状态机改成独热码，触发器个数与代码里写的状态位宽一致；`-nosrl` 防止移位寄存器被映射成 SRL16E
+5. **lint 与标签**：`lint` 列出 verilator 的全部告警（含已映射成标签的）；`-Wno-DECLFILENAME`（文件名由裁判固定）。WIDTHEXPAND 中被扩展的一方只有 1 位时（如 `a + b + cin`、`count + en`）不打 width_mismatch，多位扩展和所有截断仍然打
+6. **multi_driven**：yosys 综合日志中出现 “multiple conflicting drivers”，或 verilator 报 MULTIDRIVEN
+7. **错误样本**：除 fragile_pass 外，每个样本都必须让题目自带的 tb 仿真失败（9.3 节自带 tb 得分 1.0 的前提）。只触发 blocking_in_seq / nonblocking_in_comb、仿真却正确的写法不放进 `cases/`，放在 `judge/tests/fixtures/` 里测试
+8. **内部信号**：problem.yaml 暂时没有字段标记“仅供观察、不参与比较”的信号，现有题目的 tb 都不打印内部信号
+9. **日志**：`logs/judge.jsonl` 每行 `{ts, problem, student, diagnosis}`，路径可用环境变量 `JUDGE_LOG_PATH` 覆盖；题目目录可用 `JUDGE_PROBLEMS_DIR` 覆盖

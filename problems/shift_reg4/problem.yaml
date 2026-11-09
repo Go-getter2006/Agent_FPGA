@@ -1,0 +1,13 @@
+id: shift_reg4
+title: 4 位移位寄存器
+knowledge_points: [sequential, blocking, reset]
+primm_type: modify
+difficulty: 1
+starter: starter.v
+predict_points:
+  - {signal: q, steps: [2, 4, 11, 14]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 4        # q 四位
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  q: [10, 12]
+modify_goal: "改变移位方向：每个上升沿 q 整体向高位移一位，d 进入 q[0]；复位行为不变"

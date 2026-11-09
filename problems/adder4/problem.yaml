@@ -1,0 +1,15 @@
+id: adder4
+title: 4 位加法器（带进位）
+knowledge_points: [comb_assign, width]
+primm_type: modify
+difficulty: 1
+starter: starter.v
+predict_points:
+  - {signal: sum, steps: [2, 9]}
+  - {signal: cout, steps: [5, 8, 9]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 0        # 纯组合电路
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  sum: [10]
+  cout: [10]
+modify_goal: "加上进位：把 cin 加进去，并让 cout 输出 a + b + cin 的第 5 位（进位）"

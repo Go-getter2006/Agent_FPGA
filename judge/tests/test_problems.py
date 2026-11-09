@@ -39,6 +39,46 @@ def test_reference_ff_count(pid, run_case):
 
 
 @pytest.mark.parametrize("pid", PROBLEM_IDS)
+def test_problem_meta(pid):
+    """problem.yaml 与目录内容一致：预测题、修改题有 starter.v，创作题没有。"""
+    problem = load_problem(pid)
+    meta = problem.meta
+    assert meta["primm_type"] in ("predict", "modify", "make")
+    assert meta["difficulty"] in (1, 2, 3)
+    if meta["primm_type"] == "make":
+        assert meta["starter"] is None
+    else:
+        assert meta["starter"] == "starter.v" and (problem.dir / "starter.v").is_file()
+    if meta["primm_type"] == "modify":
+        assert meta["modify_goal"], "修改题要写 modify_goal"
+    assert (problem.dir / "spec.md").is_file()
+
+
+@pytest.mark.parametrize("pid", PROBLEM_IDS)
+def test_predict_points_exist_in_trace(pid, run_case):
+    """预测格指向的信号和 STEP 必须在参考答案的轨迹里存在。"""
+    problem = load_problem(pid)
+    trace = run_case(problem.ref_path, pid)["sim"]["trace"]
+    steps = {row["step"]: row["outputs"] for row in trace}
+    for point in problem.meta["predict_points"]:
+        for step in point["steps"]:
+            assert step in steps, f"STEP {step} 不在轨迹里"
+            assert point["signal"] in steps[step], f"{point['signal']} 不是输出信号"
+
+
+@pytest.mark.parametrize("pid", [p for p in PROBLEM_IDS if load_problem(p).meta.get("starter")])
+def test_starter_runs(pid, run_case):
+    """起始代码要能编译，并跑完整个 testbench；预测题的起始代码本身是正确的。"""
+    problem = load_problem(pid)
+    starter = run_case(problem.dir / problem.meta["starter"], pid)
+    ref = run_case(problem.ref_path, pid)
+    assert starter["compile"]["ok"], starter["compile"]
+    assert len(starter["sim"]["trace"]) == len(ref["sim"]["trace"])
+    if problem.meta["primm_type"] == "predict":
+        assert starter["tags"] == []
+
+
+@pytest.mark.parametrize("pid", PROBLEM_IDS)
 def test_case_set_quality(pid):
     """每题至少 4 个样本、至少 4 种不同的预期标签组合、至少 1 个 fragile_pass。"""
     paths = load_problem(pid).case_paths()
