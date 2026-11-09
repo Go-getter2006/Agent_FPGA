@@ -1,6 +1,6 @@
 # 数据模型与接口
 
-后端：FastAPI + SQLAlchemy 2 + Alembic。开发用 SQLite，部署用 PostgreSQL；JSON 字段在 SQLite 里用 TEXT 存，在 PostgreSQL 里用 JSONB，统一通过 SQLAlchemy 的 JSON 类型访问。所有时间存 UTC，接口返回 ISO 8601 并带时区。
+后端：FastAPI + SQLAlchemy 2 + Alembic。开发用 SQLite，部署用 PostgreSQL；JSON 字段在 SQLite 里用 TEXT 存，在 PostgreSQL 里用 json 类型，统一通过 SQLAlchemy 的 JSON 类型访问。所有时间存 UTC，接口返回 ISO 8601 并带时区。
 
 ## 1. 数据表
 | 表 | 主要字段 | 说明 |
@@ -42,8 +42,9 @@
 |---|---|---|
 | POST | /auth/login | 学号 / 工号 + 密码，写 httpOnly Cookie |
 | POST | /auth/logout | |
-| GET | /auth/me | 当前用户、角色、所在班级、分组、功能开关 |
-| POST | /auth/consent | 同意或拒绝，带协议版本 |
+| GET | /auth/me | 当前用户、角色、所在班级、分组、功能开关；`consent.required` 为 true 时（没选过，或选时的版本不是当前版本）先去知情同意页 |
+| GET | /auth/consent | 知情同意书正文（Markdown）和当前版本号，来自 `backend/app/data/consent.md`（docs/deploy.md 第 4 节） |
+| POST | /auth/consent | 同意或拒绝，带协议版本；版本不是当前版本时返回 400 `CONSENT_VERSION` |
 
 ### 3.2 学生端
 | 方法 | 路径 | 说明 |

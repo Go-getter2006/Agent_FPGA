@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from ..db import get_db
 from ..models import User
+from ..services.consent import consent_required
 from ..services.events import primary_enrollment
 from ..services.security import SESSION_COOKIE, user_for_token
 
@@ -32,6 +33,6 @@ def student_user(user: User = Depends(current_user), db: DbSession = Depends(get
     if user.role != "student":
         raise ApiError(403, "FORBIDDEN", "只有学生可以访问")
     enrollment = primary_enrollment(db, user.id)
-    if enrollment is not None and enrollment.consent_status == "pending":
-        raise ApiError(403, "CONSENT_REQUIRED", "请先阅读并选择是否参与研究")
+    if consent_required(enrollment):
+        raise ApiError(403, "CONSENT_REQUIRED", "请先阅读并选择是否参与研究（知情同意书有新版本时需要重新选择）")
     return user

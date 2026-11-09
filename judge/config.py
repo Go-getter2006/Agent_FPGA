@@ -19,8 +19,8 @@ TOP_MODULE = "top_module"
 
 
 def problems_dir() -> Path:
-    return Path(os.environ.get("JUDGE_PROBLEMS_DIR", REPO_ROOT / "problems"))
+    return Path(os.environ.get("JUDGE_PROBLEMS_DIR", "").strip() or REPO_ROOT / "problems")
 
 
 def log_path() -> Path:
-    return Path(os.environ.get("JUDGE_LOG_PATH", REPO_ROOT / "logs" / "judge.jsonl"))
+    return Path(os.environ.get("JUDGE_LOG_PATH", "").strip() or REPO_ROOT / "logs" / "judge.jsonl")

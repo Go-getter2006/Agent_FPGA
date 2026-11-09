@@ -178,3 +178,42 @@ def test_log_line_written(tmp_path, monkeypatch):
     assert record["ts"].endswith("+00:00")
     assert record["diagnosis"] == result
     assert "ts" not in result  # 时间戳只进日志
+
+
+# ---------------------------------------------------------------- 资源限制（阶段 6）
+
+def test_runner_output_limit(tmp_path, monkeypatch):
+    from judge.runner import limit_prefix, run
+    if not limit_prefix(10):
+        pytest.skip("没有 prlimit（非 Linux）")
+    monkeypatch.setenv("JUDGE_OUTPUT_MB", "1")
+    r = run(["yes", "spam"], tmp_path, timeout=10)
+    assert r.timeout and r.limit_exceeded and r.stdout == ""
+
+
+def test_runner_memory_limit(tmp_path, monkeypatch):
+    import sys
+    from judge.runner import limit_prefix, run
+    if not limit_prefix(10):
+        pytest.skip("没有 prlimit（非 Linux）")
+    monkeypatch.setenv("JUDGE_MEMORY_MB", "256")
+    r = run([sys.executable, "-c", "x = bytearray(1024 * 1024 * 1024)"], tmp_path, timeout=10)
+    assert r.returncode != 0 and "MemoryError" in r.stderr
+
+
+def test_runaway_display_loop_is_cut_off():
+    """学生代码里零延迟死循环打印：到输出上限就被终止，按超时处理，不等满 10 秒。"""
+    import time
+    from judge.runner import limit_prefix
+    code = PROBLEMS_CODE_ADDER.replace("endmodule", '  initial while (1) $display("spam");\nendmodule')
+    t0 = time.monotonic()
+    r = diagnose(code, "adder4")
+    if limit_prefix(10):
+        assert time.monotonic() - t0 < 8
+    assert r["compile"]["ok"] and r["sim"]["timeout"] and r["sim"]["trace"] == []
+
+
+PROBLEMS_CODE_ADDER = """module top_module(input [3:0] a, input [3:0] b, input cin, output [3:0] sum, output cout);
+  assign {cout, sum} = a + b + cin;
+endmodule
+"""

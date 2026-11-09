@@ -24,3 +24,6 @@ frontend/playwright-report/
 frontend/*.tsbuildinfo
 backend/eval/results/
 backend/exports/
+
+# 数据库备份（deploy/backup.sh）
+backups/

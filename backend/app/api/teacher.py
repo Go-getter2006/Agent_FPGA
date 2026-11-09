@@ -17,11 +17,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
-from ..config import CONSENT_VERSION
 from ..db import get_db, utcnow
 from ..models import (AnalysisLabel, Assignment, Attempt, ChatMessage, ChatSession, Class, Enrollment,
                       FeatureFlags, Hint, Job, Prediction, Problem, TeacherNote, User)
 from ..services import jobs, teacher_analytics as ta
+from ..services.consent import current_consent
 from ..services.events import log_event
 from ..services.flags import DEFAULT_FLAGS, FLAG_NAMES
 from ..services.icap import ICAP_VERSION, LABELS, cohen_kappa, ensure_sample, target_text
@@ -453,7 +453,7 @@ def roster(cid: int, user: User = Depends(teacher_user), db: DbSession = Depends
     own_class(db, user, cid)
     rows = db.execute(select(Enrollment, User).join(User, User.id == Enrollment.user_id)
                       .where(Enrollment.class_id == cid).order_by(Enrollment.id)).all()
-    return {"current_consent_version": CONSENT_VERSION,
+    return {"current_consent_version": current_consent().version,
             "students": [{"user_id": u.id, "alias": f"S{i:02d}", "login_name": u.login_name, "name": u.display_name,
                           "group": e.group, "consent_status": e.consent_status, "consent_version": e.consent_version,
                           "consent_at": e.consent_at} for i, (e, u) in enumerate(rows, start=1)]}

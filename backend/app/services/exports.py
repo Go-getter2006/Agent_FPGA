@@ -63,7 +63,7 @@ DATA_DICTIONARY = """# 数据字典
 
 
 def exports_dir() -> Path:
-    return Path(os.getenv("EXPORTS_DIR", REPO_ROOT / "backend" / "exports"))
+    return Path(os.getenv("EXPORTS_DIR", "").strip() or REPO_ROOT / "backend" / "exports")
 
 
 def _iso(t) -> str:

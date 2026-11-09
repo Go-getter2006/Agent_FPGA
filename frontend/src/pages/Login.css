@@ -4,7 +4,7 @@
 .login-err { color: var(--c-error); font-size: 13px; margin-bottom: 12px; }
 .login-foot { font-size: 12px; margin-top: 16px; text-align: center; }
 .consent { max-width: 760px; margin: 32px auto; padding: 32px; }
-.consent h1 { font-size: 20px; margin-bottom: 8px; }
-.consent h2 { font-size: 16px; margin: 20px 0 6px; }
-.consent p, .consent li { font-size: 14px; color: #374151; }
+.consent h3.md-h { font-size: 20px; margin: 20px 0 8px; }
+.consent h4.md-h { font-size: 16px; margin: 20px 0 6px; }
+.consent p, .consent li { font-size: 14px; color: #374151; line-height: 1.7; }
 .consent-actions { display: flex; gap: 12px; margin-top: 24px; }

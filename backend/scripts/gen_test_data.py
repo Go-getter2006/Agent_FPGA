@@ -31,6 +31,7 @@ from backend.app.models import (Assignment, Attempt, ChatMessage, ChatSession, C
                                 FeatureFlags, Hint, Investigation, Prediction, Problem, Progress, ShuffleRun,
                                 TbSubmission, User)
 from backend.app.services import fallback_hints
+from backend.app.services.consent import current_consent
 from backend.app.services.events import log_event
 from backend.app.services.flags import DEFAULT_FLAGS
 from backend.app.services.learner_model import (evaluate_prediction, prediction_misconceptions, prediction_ok,
@@ -144,7 +145,7 @@ def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, wee
                 u.anon_id = anon_id_for(u.id)
                 consent = "declined" if idx % 7 == 0 else ("pending" if idx % 13 == 0 else "accepted")
                 db.add(Enrollment(class_id=cls.id, user_id=u.id, group=group, consent_status=consent,
-                                  consent_version="v1-draft" if consent != "pending" else None,
+                                  consent_version=current_consent().version if consent != "pending" else None,
                                   consent_at=start if consent != "pending" else None))
                 students.append((u, group, idx))
         db.flush()

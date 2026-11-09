@@ -1,4 +1,7 @@
-"""后端测试：独立的临时 SQLite 库，任务在请求里同步执行（JOBS_INLINE=1）。"""
+"""后端测试：独立的临时 SQLite 库，任务在请求里同步执行（JOBS_INLINE=1）。
+
+检查 PostgreSQL 兼容性时设 TEST_DATABASE_URL=postgresql+psycopg://…（一个专门的空库，测试开始时会清空）。
+"""
 from __future__ import annotations
 
 import itertools
@@ -7,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="backend_tests_"))
-os.environ["DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_TMP / 'test.db'}"
 os.environ["JOBS_INLINE"] = "1"
 os.environ["ANON_SALT"] = "test-salt"
 os.environ["JUDGE_LOG_PATH"] = str(_TMP / "judge.jsonl")
@@ -22,6 +25,7 @@ from backend.app import models  # noqa: E402,F401
 from backend.app.db import Base, SessionLocal, engine  # noqa: E402
 from backend.app.main import create_app  # noqa: E402
 from backend.app.models import Class, Enrollment, FeatureFlags, User  # noqa: E402
+from backend.app.services.consent import current_consent  # noqa: E402
 from backend.app.services.flags import DEFAULT_FLAGS  # noqa: E402
 from backend.app.services.problems_sync import sync_all  # noqa: E402
 from backend.app.services.security import anon_id_for, hash_password  # noqa: E402
@@ -32,6 +36,8 @@ _counter = itertools.count(1)
 
 @pytest.fixture(scope="session", autouse=True)
 def _database():
+    if engine.dialect.name != "sqlite":
+        Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
         sync_all(db)
@@ -70,7 +76,8 @@ def make_user(role: str = "student", group: str = "treatment", consent: str = "a
         db.flush()
         if role == "student":
             user.anon_id = anon_id_for(user.id)
-            db.add(Enrollment(class_id=class_id, user_id=user.id, group=group, consent_status=consent))
+            db.add(Enrollment(class_id=class_id, user_id=user.id, group=group, consent_status=consent,
+                              consent_version=None if consent == "pending" else current_consent().version))
         db.commit()
         db.refresh(user)
         return user

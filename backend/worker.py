@@ -32,7 +32,7 @@ def _handle_stop(signum, frame):  # noqa: ARG001
 
 
 def worker_count() -> int:
-    env = os.getenv("JUDGE_WORKERS")
+    env = os.getenv("JUDGE_WORKERS", "").strip()
     if env:
         return max(1, int(env))
     return max(1, (os.cpu_count() or 2) - 1)

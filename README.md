@@ -21,9 +21,13 @@ python -m backend.worker                              # 判题任务
 ```
 环境变量见 `.env.example`（只写变量名和默认值）。
 
+## 部署
+见 [docs/deploy.md](docs/deploy.md)：`cp .env.example .env`，填好密码和盐，`docker compose up -d --build`；备份恢复用 `deploy/backup.sh` / `deploy/restore.sh`。
+
 ## 测试
 ```bash
 python -m pytest                       # 裁判 + 后端
+TEST_DATABASE_URL=postgresql+psycopg://用户:密码@主机/空库 python -m pytest backend/tests   # 在 PostgreSQL 上再跑一遍（需 pip install -r backend/requirements-deploy.txt）
 (cd frontend && npx vitest run)        # 前端单元测试
 (cd frontend && npx playwright test --trace off)   # 端到端（自动启动全新的后端和前端）
 ```

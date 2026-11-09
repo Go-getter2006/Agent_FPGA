@@ -1,0 +1,56 @@
+# 部署：数据库、后端接口、判题进程、前端（nginx）。用法见 docs/deploy.md
+#   cp .env.example .env    # 填好密码、ANON_SALT、DEEPSEEK_API_KEY
+#   docker compose up -d --build
+x-backend: &backend
+  build: { context: ., dockerfile: deploy/Dockerfile.backend }
+  image: agent-fpga-backend
+  env_file: .env
+  environment: &backend-env
+    APP_ENV: production
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent}:${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agent_fpga}
+    JUDGE_LOG_PATH: /data/logs/judge.jsonl
+    EXPORTS_DIR: /data/exports
+  volumes:
+    - appdata:/data
+  depends_on:
+    db: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agent_fpga}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent} -d ${POSTGRES_DB:-agent_fpga}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    command: sh -c "alembic -c backend/alembic.ini upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    <<: *backend
+    command: python -m backend.worker
+    environment:
+      <<: *backend-env
+      JUDGE_WORKERS: ${JUDGE_WORKERS:-2}
+
+  web:
+    build: { context: ., dockerfile: deploy/Dockerfile.web }
+    image: agent-fpga-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from ..config import APP_VERSION, CONSENT_VERSION, get_settings
+from ..config import APP_VERSION, get_settings
 from ..db import get_db, utcnow
 from ..models import Class, Enrollment, User
+from ..services.consent import consent_required, current_consent
 from ..services.events import log_event
 from ..services.flags import flags_for
 from ..services.security import (SESSION_COOKIE, create_session, delete_session, user_for_token,
@@ -25,7 +26,7 @@ class LoginIn(BaseModel):
 
 class ConsentIn(BaseModel):
     accept: bool
-    version: str = CONSENT_VERSION
+    version: str = Field(min_length=1, max_length=32)   # 学生看到的版本；与当前版本不一致就拒绝
 
 
 def me_payload(db: DbSession, user: User) -> dict:
@@ -38,8 +39,8 @@ def me_payload(db: DbSession, user: User) -> dict:
         consent = {
             "status": primary.consent_status if primary else "accepted",
             "version": primary.consent_version if primary else None,
-            "current_version": CONSENT_VERSION,
-            "required": bool(primary and primary.consent_status == "pending"),
+            "current_version": current_consent().version,
+            "required": consent_required(primary),
         }
         flags = flags_for(db, primary.class_id if primary else None, primary.group if primary else None)
     else:
@@ -82,11 +83,18 @@ def me(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     return me_payload(db, user)
 
 
+@router.get("/consent")
+def consent_text(user: User = Depends(current_user)):
+    """知情同意书正文（Markdown）和版本号。"""
+    c = current_consent()
+    return {"version": c.version, "markdown": c.markdown}
+
+
 @router.post("/consent")
 def consent(body: ConsentIn, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     if user.role != "student":
         raise ApiError(403, "FORBIDDEN", "只有学生需要选择是否参与研究")
-    if body.version != CONSENT_VERSION:
+    if body.version != current_consent().version:
         raise ApiError(400, "CONSENT_VERSION", "知情同意书已更新，请刷新页面后重新阅读")
     status = "accepted" if body.accept else "declined"
     for e in db.scalars(select(Enrollment).where(Enrollment.user_id == user.id)).all():
