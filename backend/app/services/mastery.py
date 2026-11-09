@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session as DbSession
 
 from ..config import get_settings
 from ..models import Attempt, KnowledgePoint, MasterySnapshot, Problem
+from .answer import reveal_times
 from .learner_model import QUADRANTS, AttemptView, KpSummary, prediction_ok, summarize_kp
 
 
 def attempt_views(db: DbSession, user_id: int, kp: str | None = None) -> list[AttemptView]:
-    """该学生已判完、带预测、编译通过的尝试；指定 kp 时只取关联该知识点的题。"""
+    """该学生已判完、带预测、编译通过的尝试；指定 kp 时只取关联该知识点的题。
+    看过某题参考答案之后，该题的尝试不计入（services/answer.py）。"""
     theta = get_settings().pred_threshold
+    revealed = reveal_times(db, user_id)
     rows = db.execute(
         select(Attempt, Problem.knowledge_points)
         .join(Problem, Problem.id == Attempt.problem_id)
@@ -21,6 +24,8 @@ def attempt_views(db: DbSession, user_id: int, kp: str | None = None) -> list[At
     out = []
     for attempt, kps in rows:
         if kp is not None and kp not in (kps or []):
+            continue
+        if attempt.problem_id in revealed and attempt.created_at > revealed[attempt.problem_id]:
             continue
         out.append(AttemptView(created_at=attempt.created_at, sim_ok=bool(attempt.sim_ok),
                                pred_ok=bool(prediction_ok(attempt.pred_accuracy, theta)),

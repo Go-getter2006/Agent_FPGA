@@ -126,6 +126,12 @@ def sync_problems(db: DbSession, problems_dir: Path | None = None) -> list[str]:
             "tb_template": tb_template(skeleton),
             "starter_hash": starter_hash,
             "starter_eval": starter_eval,
+            # 第 4 级提示“参考答案”：满足解锁条件后才返回给学生（只在服务端使用）
+            "ref_code": p.ref_path.read_text(encoding="utf-8"),
+            # 第 3 级规则提示用的代码框架（可选文件 skeleton.v，____ 处留给学生填写）
+            "code_skeleton": (p.dir / "skeleton.v").read_text(encoding="utf-8") if (p.dir / "skeleton.v").is_file() else None,
+            "order": int(meta.get("order", 100)),     # 题目列表里的顺序：入门题排在前面
+            "stage": meta.get("stage") or "",
         }
         row.synced_at = utcnow()
         db.add(row)

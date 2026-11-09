@@ -259,3 +259,137 @@ def generate(diagnosis: dict, level: int, *, evaluation: dict | None = None, qua
         "tag": tag,
         "template": f"{tag}.{level}",
     }
+
+
+# ---------------------------------------------------------------- 第 2 版：1 思路 → 2 定位 → 3 代码提示
+# （参考答案是第 4 级，由系统直接展示 ref.v，不经过模板）
+# 1 级用原来的“概念 + 类比”，2 级用原来的“定位”，3 级给代码框架：____ 处留给学生填写。
+
+FALLBACK_V2 = "fallback_v2"
+
+CODE_HINTS: dict[str, tuple[str, str, str]] = {
+    # tag: (message, question, code)
+    "compile_error": (
+        "对照下面的写法检查第 {error_line} 行：在 `always` 块里赋值的信号声明成 `reg`，用 `assign` 驱动的声明成 `wire`；"
+        "每条语句以分号结尾，`begin` 和 `end` 要成对。",
+        "你那一行属于哪一种？声明和赋值方式对得上吗？",
+        "output reg  q,          // 在 always 块里赋值 → reg\n"
+        "output wire y           // 用 assign 驱动   → wire\n"
+        "\n"
+        "assign y = ____;        // 分号结尾\n"
+        "always @(posedge clk) begin\n"
+        "    q <= ____;\n"
+        "end                     // begin 和 end 成对"),
+    "non_synthesizable": (
+        "能变成电路的循环，次数必须是写死的常数。可以按下面的框架，把每一种情况都检查一遍：",
+        "框架里的 4 对应你题目里的什么？",
+        "integer i;\n"
+        "always @(*) begin\n"
+        "    ____ = 0;                       // 先给默认值\n"
+        "    for (i = 0; i < 4; i = i + 1)   // 循环次数是常数\n"
+        "        if (____) ____ = i;\n"
+        "end"),
+    "race_order_sensitive": (
+        "两个寄存器在同一个时钟沿互相读写时，都用 `<=`：每一句读到的都是时钟沿**之前**的旧值，和语句先后无关。",
+        "把这个写法用到你的代码上，哪几行要改？",
+        "always @(posedge clk) begin\n"
+        "    x <= y;   // 读到的是 y 的旧值\n"
+        "    y <= x;   // 读到的也是 x 的旧值\n"
+        "end"),
+    "latch_inferred": (
+        "组合 `always` 块里，先给输出一个默认值，再按条件改写，就不会漏掉任何一种情况：",
+        "你的代码里，哪个输出缺了默认值或者缺了 else？",
+        "always @(*) begin\n"
+        "    y = 1'b0;            // 默认值：所有情况都有值\n"
+        "    if (____)\n"
+        "        y = ____;\n"
+        "end"),
+    "multi_driven": (
+        "同一个信号的所有赋值要写进**同一个** `always` 块（或者只用一条 `assign`）：",
+        "你的代码里，这个信号的赋值分散在哪几处？",
+        "always @(posedge clk) begin\n"
+        "    if (rst)\n"
+        "        q <= ____;       // 复位\n"
+        "    else if (____)\n"
+        "        q <= ____;       // q 的所有赋值都在这一个块里\n"
+        "end"),
+    "blocking_in_seq": (
+        "时序 `always` 块（`@(posedge clk)`）里用 `<=`：所有寄存器在同一个时钟沿一起更新。",
+        "把第 {lint_lines} 行改成这种写法后，第二句读到的是旧值还是新值？",
+        "always @(posedge clk) begin\n"
+        "    a <= ____;   // 时序块里用 <=\n"
+        "    b <= a;      // 读到的是 a 在时钟沿之前的旧值\n"
+        "end"),
+    "nonblocking_in_comb": (
+        "组合 `always @(*)` 块里用 `=`：算出的中间结果马上能被后面的语句用到。",
+        "第 {lint_lines} 行换成这种写法后，后一句能立刻用上新值吗？",
+        "always @(*) begin\n"
+        "    t = ____;        // 组合块里用 =\n"
+        "    y = t & ____;    // 立刻用上 t 的新值\n"
+        "end"),
+    "width_mismatch": (
+        "让结果的位宽“装得下”：先把操作数扩宽，再参与运算，最高位就不会丢。",
+        "你的结果最多需要几位？",
+        "wire [4:0] s;                         // 5 位才装得下进位\n"
+        "assign s = {1'b0, x} + {1'b0, y};     // 先扩成 5 位再相加\n"
+        "assign hi = s[4];                     // 最高位单独取出来"),
+}
+
+GENERIC_SEQ = ("always @(posedge clk) begin\n"
+               "    if (rst) begin\n"
+               "        ____ <= 0;            // 复位：回到初始值\n"
+               "    end else begin\n"
+               "        ____ <= ____;         // 每个时钟上升沿更新一次\n"
+               "    end\n"
+               "end")
+GENERIC_COMB = ("assign ____ = ____;          // 简单的组合逻辑用 assign\n"
+                "\n"
+                "always @(*) begin            // 复杂一点的用 always @(*)\n"
+                "    ____ = ____;             // 组合块里用 =\n"
+                "end")
+
+
+def generate_v2(diagnosis: dict, level: int, *, evaluation: dict | None = None, quadrant: str | None = None,
+                shuffle: dict | None = None, problem_kps: list[str] | None = None,
+                skeleton: str | None = None, clocked: bool | None = None) -> dict:
+    """第 2 版规则提示：输出 {level, focus, message, question, concept_tags, code, tag, template}。"""
+    level = max(1, min(3, int(level)))
+    if shuffle and shuffle.get("order_sensitive") and "race_order_sensitive" not in diagnosis.get("tags", []):
+        diagnosis = {**diagnosis, "tags": [*diagnosis.get("tags", []), "race_order_sensitive"]}
+    tag = primary_tag(diagnosis, evaluation)
+    ctx = _context(diagnosis, evaluation, quadrant, shuffle)
+    if tag in ctx["_lint_lines"]:
+        ctx["lint_lines"] = ctx["_lint_lines"][tag]
+    values = _SafeDict({k: ("…" if v is None else v) for k, v in ctx.items() if not k.startswith("_")})
+    code = ""
+    if level == 1:                     # 思路：概念 + 类比
+        concept_msg, question = TEMPLATES[tag][2]
+        message = f"{concept_msg}\n\n{TEMPLATES[tag][3][0]}"
+    elif level == 2:                   # 定位
+        message, question = TEMPLATES[tag][1]
+    elif tag in CODE_HINTS:            # 代码提示：针对这个问题的写法
+        message, question, code = CODE_HINTS[tag]
+    elif tag == "pass":
+        message, question = TEMPLATES["pass"][2]
+    else:                              # 代码提示：本题的代码框架
+        if clocked is None:
+            trace = (diagnosis.get("sim") or {}).get("trace") or []
+            clocked = bool(trace and ("clk" in trace[0].get("inputs", {}) or "rst" in trace[0].get("inputs", {})))
+        code = skeleton or (GENERIC_SEQ if clocked else GENERIC_COMB)
+        message = ("下面是这道题的代码框架，把 `____` 换成你自己的写法。" if skeleton
+                   else "下面是这类电路的常用写法，把 `____` 换成你自己的写法。")
+        question = ("框架里哪一处决定了第 {step} 步的 {signal}？" if tag == "sim_mismatch"
+                    else "对照框架，你的代码少了哪一部分？")
+    concept = TAG_CONCEPTS.get(tag) or []
+    if not concept and problem_kps:
+        concept = problem_kps[:1]
+    return {
+        "level": level,
+        "focus": _focus(tag, ctx, diagnosis),
+        "message": message.format_map(values),
+        "question": question.format_map(values),
+        "concept_tags": concept,
+        "code": code,
+        "tag": tag,
+        "template": f"{tag}.v2.{level}",
+    }
