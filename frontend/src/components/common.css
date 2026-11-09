@@ -49,3 +49,5 @@
 .chip.green { background: #DCFCE7; color: #166534; }
 /* 等宽字体不要连字：<= 必须显示成 <=，不能变成 ≤ */
 code, pre, .md-code, .code-block pre, .monaco-editor { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+/* 弹窗里的长代码（参考答案）在框内滚动 */
+.ant-modal .code-block pre { max-height: 62vh; overflow: auto; }

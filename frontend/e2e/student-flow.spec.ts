@@ -378,6 +378,8 @@ test('参考答案：提交 3 次没通过并看过代码提示后解锁', async
   await page.getByTestId('answer-open').click()
   await page.getByRole('button', { name: '看参考答案', exact: true }).click()
   await expect(page.locator('.ant-modal').filter({ hasText: '参考答案' }).getByTestId('code-block')).toContainText('S101')
+  await expect(page.locator('.ant-modal-confirm')).toHaveCount(0)
+  await page.waitForTimeout(400)                       // 等弹窗动画结束再截图
   await page.screenshot({ path: `${SHOTS}/answer.png` })
   expect(eventTypes('S2026006')).toContain('answer.reveal')
 })
