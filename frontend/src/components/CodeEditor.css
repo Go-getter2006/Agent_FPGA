@@ -1,0 +1,5 @@
+.ln-link { background: var(--c-link); }
+.ln-drv-bar { background: var(--c-primary); width: 3px !important; margin-left: 2px; }
+.ln-pick { background: var(--c-primary-bg); }
+.ln-pick-no { color: var(--c-primary) !important; font-weight: 700; }
+.editor-ro .monaco-editor .view-lines { cursor: pointer; }

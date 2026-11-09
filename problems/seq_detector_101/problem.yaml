@@ -1,0 +1,13 @@
+id: seq_detector_101
+title: 序列检测器（101）
+knowledge_points: [fsm, sequential, reset]
+primm_type: make
+difficulty: 2
+starter: null
+predict_points:
+  - {signal: out, steps: [3, 4, 5, 15]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 2        # state 两位；out 是组合输出
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  out: [23]
+modify_goal: ""

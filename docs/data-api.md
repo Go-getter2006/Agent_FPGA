@@ -1,6 +1,6 @@
 # 数据模型与接口
 
-后端：FastAPI + SQLAlchemy 2 + Alembic。开发用 SQLite，部署用 PostgreSQL；JSON 字段在 SQLite 里用 TEXT 存，在 PostgreSQL 里用 JSONB，统一通过 SQLAlchemy 的 JSON 类型访问。所有时间存 UTC，接口返回 ISO 8601 并带时区。
+后端：FastAPI + SQLAlchemy 2 + Alembic。开发用 SQLite，部署用 PostgreSQL；JSON 字段在 SQLite 里用 TEXT 存，在 PostgreSQL 里用 json 类型，统一通过 SQLAlchemy 的 JSON 类型访问。所有时间存 UTC，接口返回 ISO 8601 并带时区。
 
 ## 1. 数据表
 | 表 | 主要字段 | 说明 |
@@ -42,8 +42,9 @@
 |---|---|---|
 | POST | /auth/login | 学号 / 工号 + 密码，写 httpOnly Cookie |
 | POST | /auth/logout | |
-| GET | /auth/me | 当前用户、角色、所在班级、分组、功能开关 |
-| POST | /auth/consent | 同意或拒绝，带协议版本 |
+| GET | /auth/me | 当前用户、角色、所在班级、分组、功能开关；`consent.required` 为 true 时（没选过，或选时的版本不是当前版本）先去知情同意页 |
+| GET | /auth/consent | 知情同意书正文（Markdown）和当前版本号，来自 `backend/app/data/consent.md`（docs/deploy.md 第 4 节） |
+| POST | /auth/consent | 同意或拒绝，带协议版本；版本不是当前版本时返回 400 `CONSENT_VERSION` |
 
 ### 3.2 学生端
 | 方法 | 路径 | 说明 |
@@ -93,3 +94,24 @@
 - metrics.csv：anon_id, group, knowledge_point, level, r_code, r_pred, f_value, B, H, tb_score
 - data_dictionary.md：每个字段的含义与取值
 - 只含 consent_status 为已同意的学生
+
+## 6. 阶段 3 实现补充（与上文的差异）
+- 新增表：`sessions`（登录会话，库里只存令牌哈希）、`progress`（学生在每道题上的 PRIMM 步骤与状态）
+- 字段补充：`attempts.attempt_no`、`attempts.finished_at`、`attempts.error`、`attempts.analysis`（预测逐格对照与预测误区）；`predictions.result`（判完后的逐格对照）；`shuffle_runs.prediction`（实验前的预测 change / same）与 `status`；`tb_submissions.status`；`review_items.status`、`source_attempt_id`、`question`（代码、预测格；标准答案只在服务端）；`assignments.title`；`jobs.user_id`
+- 新增接口：`GET /student/testbench/{id}`（testbench 打分结果，`missed_types` 只用文字说明没抓住的 bug 类型，不给代码）、`GET /api/health`
+- `POST /student/problems/{pid}/predictions` 一次锁定波形预测和硬件问题两部分，返回 `prediction_ids`
+- 预测题、修改题在进入修改阶段之前，`POST .../attempts` 运行的一律是起始代码
+- 事件：前端只能上报 `page.view`、`step.enter`、`problem.open`、`waveform.view`、`waveform.cell_click`；其余事件由后端在对应操作里写入
+- 任务：测试时设 `JOBS_INLINE=1`，任务在请求里同步执行；正常运行用 `python -m backend.worker`
+
+## 7. 阶段 4 实现补充
+- 新增表：`llm_calls`（字段同 docs/llm-deepseek.md 第 9 节，另有 `cost_cny`、`error`、`user_id`）、`chat_sessions`（每个学生每道题一个）、`chat_messages`（另有 `source`、`attempt_id`）
+- `GET /student/problems/{pid}/chat`：对话历史；`POST /student/problems/{pid}/chat`：SSE，事件为 `{"delta", "source"}` 若干条，最后一条 `{"done": true, "message_id", "source", "flagged"}`；超过每小时 30 条返回 429 `CHAT_LIMIT`
+- 提示接口返回的提示带 `source`（llm / fallback）、`fallback_reason`、`prompt_version`、`model`
+
+## 8. 阶段 5 实现补充
+- 新增表：`analysis_labels`（另有 `class_id`、`llm_call_id`、`sampled`、`created_at`）、`teacher_notes`
+- 教师端接口另有：`GET /teacher/status`（大模型可用性与当天费用，顶栏预算提示用）、`POST /teacher/classes/{cid}/anonymity`（关闭 / 打开匿名，写事件）、`GET /teacher/classes/{cid}/heatmap/cell`（热力图格子的最近尝试）、`GET /teacher/classes/{cid}/misconceptions/{code}`（误区详情）、`GET /teacher/attempts/{aid}`（尝试详情）、`GET /teacher/problems`（题库预览）、`GET /teacher/classes/{cid}/assignments`、`GET /teacher/classes/{cid}/groups`、`GET /teacher/classes/{cid}/analysis/icap`（编码汇总与 κ）、`GET /teacher/classes/{cid}/roster`、`POST /teacher/students/{uid}/reset_password`
+- 越权：教师访问其他教师的班级或学生返回 403；导出文件只有发起导出的教师能下载；admin 可以访问全部
+- 名单导入：CSV 每行“学号,姓名[,分组]”；新账号生成临时密码，只在导入结果里出现一次
+- 测试数据：`python -m backend.scripts.gen_test_data` 生成 2 组 × 30 名虚拟学生 × 20 次尝试（裁判结果来自对参考答案、起始代码和错误样本的真实诊断）

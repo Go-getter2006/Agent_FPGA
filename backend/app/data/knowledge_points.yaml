@@ -1,0 +1,13 @@
+# 知识点表（docs/learner-model.md 第 2 节）。与 C 语言系统完全独立。
+# 教师可增改；后端启动时同步到 knowledge_points 表。sort_order 即课程顺序。
+- {code: comb_assign, name: 组合逻辑与 assign, description: 用 assign 描述组合电路、运算符与表达式}
+- {code: comb_always, name: always 组合块与完整赋值（锁存器）, description: "always @(*) 里每条路径都要赋值，否则生成锁存器"}
+- {code: blocking, name: 阻塞与非阻塞赋值, description: "= 与 <= 的区别：时序块用 <=，组合块用 ="}
+- {code: sequential, name: 时序逻辑与触发器（时钟沿）, description: 时钟沿触发的 always 块、触发器在什么时候更新}
+- {code: reset, name: 同步 / 异步复位, description: 复位的优先级与时序}
+- {code: counter, name: 计数器与分频, description: 计数、回绕、使能}
+- {code: fsm, name: 有限状态机, description: 状态寄存器、次态逻辑、输出逻辑}
+- {code: width, name: 位宽、拼接与截断, description: "表达式位宽、拼接 {}、截断与扩展"}
+- {code: hierarchy, name: 模块例化与层次, description: 子模块例化、端口连接}
+- {code: testbench, name: testbench 与激励设计, description: 怎样设计激励才能暴露 bug}
+- {code: parallel, name: 并行与竞争, description: 硬件是并行的；仿真器按顺序执行时可能出现竞争}

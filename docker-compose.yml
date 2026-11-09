@@ -1,0 +1,78 @@
+# 部署：数据库、后端接口、判题进程、前端（nginx）。用法见 docs/deploy.md
+#   deploy/quickstart.sh                 # 一键：生成 .env、构建启动、导入演示数据
+# 或手动：
+#   cp .env.example .env                 # 填好 POSTGRES_PASSWORD、ANON_SALT，可选 DEEPSEEK_API_KEY
+#   docker compose up -d --build
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile.backend
+    args:
+      APT_MIRROR: ${APT_MIRROR:-}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+  image: agent-fpga-backend
+  env_file: .env
+  environment: &backend-env
+    APP_ENV: production
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent}:${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agent_fpga}
+    JUDGE_LOG_PATH: /data/logs/judge.jsonl
+    EXPORTS_DIR: /data/exports
+  volumes:
+    - appdata:/data
+  depends_on:
+    db: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agent_fpga}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent} -d ${POSTGRES_DB:-agent_fpga}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    command: sh -c "alembic -c backend/alembic.ini upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+    # 迁移和题目同步都完成、接口能响应才算就绪；worker 和 web 等它就绪再启动
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 60
+
+  worker:
+    <<: *backend
+    command: python -m backend.worker
+    depends_on:
+      db: { condition: service_healthy }
+      api: { condition: service_healthy }     # 数据表由 api 启动时的迁移创建
+    environment:
+      <<: *backend-env
+      JUDGE_WORKERS: ${JUDGE_WORKERS:-2}
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    image: agent-fpga-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

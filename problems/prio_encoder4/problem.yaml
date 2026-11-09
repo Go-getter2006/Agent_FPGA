@@ -1,0 +1,15 @@
+id: prio_encoder4
+title: 4 位优先编码器
+knowledge_points: [comb_always, comb_assign]
+primm_type: predict
+difficulty: 1
+starter: starter.v
+predict_points:
+  - {signal: pos, steps: [3, 6, 9, 15]}
+  - {signal: valid, steps: [0]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 0        # 纯组合电路
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  valid: [8]
+  pos: [12, 13, 14, 15]
+modify_goal: ""

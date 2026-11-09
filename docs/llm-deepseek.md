@@ -187,3 +187,12 @@ $$C=\frac{T_{\text{hit}}\,p_{\text{hit}}+T_{\text{miss}}\,p_{\text{miss}}+T_{\te
 - 对每道题的每个错误样本，按 1–3 级各生成一条提示，导出 CSV：题目、样本、等级、提示原文、校验结果
 - 人工按四项打 1–5 分：准确（与诊断一致）、不泄露答案、引导性、易懂；**不使用大模型给大模型打分**
 - 汇总脚本输出各项均分和违规率；要比较的方案（如思考模式开 / 关、提示词 v1 / v2）各跑一遍，用同一套样本
+
+## 13. 实现说明（阶段 4）
+- 已用真实接口核对：`deepseek-flash` + `extra_body={"thinking": {"type": "disabled"}}` + JSON Output 正常；`usage` 里有 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`；同一道题第二次调用起约 90% 的输入命中缓存
+- 代码位置：客户端 `backend/app/services/llm.py`；分级提示 `llm_hints.py`；校验 `hint_guard.py`；对话 `chat.py`；提示词 `backend/prompts/`（hint_system_v1、hint_user_v1、chat_system_v1）
+- 降级原因记在提示内容的 `fallback_reason` 里：`disabled`（分组关闭了 llm_hints）、`no_key`、`breaker_open`、`budget`、`error`（重试后仍失败，含 Key 无效、断网）、`invalid`（重试 1 次后仍没通过校验）。除 `disabled` 外，界面显示“当前为简化提示，不影响仿真和判定”
+- 401 / 403 / 400 不重试；429、5xx、超时、连接失败、空 content 按 1 秒、3 秒重试
+- 5.3 第 3 条的“代码样式行”在实现时放宽了识别范围：else、begin、end*、input、output、localparam、parameter 开头的行，以及形如 `x = …;`、`S0: x = …;` 的赋值语句行也算（原规则漏掉了 `case` 后面跟阻塞赋值的写法）；阈值仍是 2 行
+- 对话：服务端边收边查，命中泄露规则即停止转发并补一句提示；`chat_messages.flagged` 标记，`llm_calls.status = blocked`，原始输出留在 `llm_calls.output` 供研究复现
+- 评测：`python -m backend.eval.hints`（样本代码去掉开头注释；没有预测数据时象限按仿真结果推定：通过 → fragile，没通过 → concept_gap）；人工评分后用 `python -m backend.eval.summarize 评分.csv --by prompt_version,thinking` 汇总。CSV 用 UTF-8 BOM，Excel 直接打开不乱码

@@ -1,0 +1,41 @@
+# 部署检查：在 GitHub 的服务器上按 deploy/quickstart.sh 真正构建、启动整套系统，再跑冒烟测试。
+# 只在部署相关的文件改动时运行，也可以在 Actions 页面手动运行。
+name: 部署检查
+on:
+  push:
+    paths:
+      - deploy/**
+      - docker-compose.yml
+      - .env.example
+      - backend/requirements*.txt
+      - frontend/package*.json
+      - .github/workflows/deploy-check.yml
+  workflow_dispatch:
+
+jobs:
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: 一键部署
+        run: DEMO_PASSWORD=ci-demo-pass deploy/quickstart.sh
+      - name: 冒烟测试
+        run: python3 deploy/smoke_test.py http://localhost:8080 ci-demo-pass
+      - name: 备份与恢复
+        run: |
+          deploy/backup.sh
+          YES=1 deploy/restore.sh "$(ls backups/db-*.dump | tail -1)"
+          for i in $(seq 1 60); do curl -fsS http://localhost:8080/api/health && break; sleep 2; done
+          python3 deploy/smoke_test.py http://localhost:8080 ci-demo-pass
+      - name: 进程没有崩溃过
+        run: |
+          if docker compose logs api worker | grep -q Traceback; then
+            docker compose logs api worker | grep -B2 -A30 Traceback | head -80
+            exit 1
+          fi
+      - name: 容器状态和日志
+        if: always()
+        run: |
+          docker compose ps
+          docker compose logs --tail 80 api worker

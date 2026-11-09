@@ -1,0 +1,13 @@
+[project]
+name = "agent-fpga"
+version = "0.1.0"
+description = "Verilog 个性化辅导智能体（研究原型）"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["judge/tests", "backend/tests"]
+pythonpath = ["."]

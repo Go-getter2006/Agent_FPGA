@@ -1,0 +1,13 @@
+id: counter_mod10
+title: 模 10 计数器
+knowledge_points: [counter, sequential, reset]
+primm_type: make
+difficulty: 1
+starter: null
+predict_points:
+  - {signal: q, steps: [9, 10, 14, 16]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 4        # q 四位
+expected_drivers:           # 阶段 2 用：ref.v 里驱动各输出的源码行
+  q: [10, 12, 13]
+modify_goal: ""

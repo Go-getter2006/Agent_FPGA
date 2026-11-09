@@ -129,12 +129,12 @@ modify_goal: ""             # 修改题的目标说明
 - 学生提交自己的 testbench（必须实例化 top_module，并按第 4 节格式打印）
 - 先用 ref.v 跑学生 tb：编译失败或一行 STEP 都没有，返回中文错误说明
 - 再用 cases/ 里每个错误样本跑同一个 tb：输出轨迹与 ref.v 的轨迹不同，就算“抓住”这个 bug
-- 预期标签含 fragile_pass 的样本不计入：它们的仿真输出与参考答案相同，任何激励都抓不到
+- 不计入的样本：预期标签含 fragile_pass 的（仿真输出与参考答案相同，任何激励都抓不到），以及预期标签含 compile_error 的（任何激励下都编译不过，总会被“抓住”，计入等于白送分）。阶段 2 起改为这样
 - 得分：
 
 $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
 
-其中，$\mathcal{M}$ 为该题全部错误样本的集合，$\mathcal{E}$ 为不计入的样本（预期标签含 fragile_pass），$\mathcal{C}$ 为被学生 testbench 抓住的样本；$|\cdot|$ 表示集合中的元素个数。
+其中，$\mathcal{M}$ 为该题全部错误样本的集合，$\mathcal{E}$ 为不计入的样本（预期标签含 fragile_pass 或 compile_error），$\mathcal{C}$ 为被学生 testbench 抓住的样本；$|\cdot|$ 表示集合中的元素个数。
 
 - 输出：
 ```json
@@ -142,3 +142,39 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
  "caught": ["c1_latch.v", "c4_width.v"], "missed": ["c3_reset.v"], "excluded": ["c2_fragile.v"]}
 ```
 - 验收：把题目自带的 tb.v 当作“学生 tb”提交时，得分必须为 1.0。这同时检验题目质量：自带 tb 必须能抓住所有可抓的样本
+
+## 10. 实现约定（阶段 1 定下，后续阶段沿用）
+1. **语言标准**：三个工具都按 Verilog-2005（iverilog `-g2005`、yosys 默认、verilator `--default-language 1364-2005`）。tb 的顶层模块名固定为 `tb`，编译时用 `-s tb`
+2. **JSON 补充字段**（只增不改）：
+   - `compile.errors` 每项为 `{file, line, message}`，`file` 区分报错在 `student.v` 还是 `tb.v`
+   - `synth.timeout`：综合超时时为 true，此时不打 non_synthesizable
+   - 编译失败时：`sim.trace` 为空，`synth.ok` 为 null（未运行），`hardware` 各字段为 null，`lint` 为空，标签只有 compile_error
+3. **仿真超时**：轨迹为空、`first_mismatch` 为 null、`sim.timeout` 为 true，并打 sim_mismatch（不新增标签；前端据 timeout 提示“可能有组合环路或死循环”）
+4. **触发器信号与个数**：
+   - `ff_signals` / `latch_signals`：`proc; flatten; opt_clean` 之后读 RTLIL 中触发器 / 锁存器单元 Q 端连接的信号名。加 `opt_clean` 是为了去掉输出没人用的单元，否则 for 循环变量、块内临时变量也会被算成触发器
+   - `ff_count` / `lut_count`：`synth_xilinx -flatten -nosrl` 之后 `stat`。综合前给所有信号加 `fsm_encoding="none"`，不让 yosys 把状态机改成独热码，触发器个数与代码里写的状态位宽一致；`-nosrl` 防止移位寄存器被映射成 SRL16E
+5. **lint 与标签**：`lint` 列出 verilator 的全部告警（含已映射成标签的）；`-Wno-DECLFILENAME`（文件名由裁判固定）。WIDTHEXPAND 中被扩展的一方只有 1 位时（如 `a + b + cin`、`count + en`）不打 width_mismatch，多位扩展和所有截断仍然打
+6. **multi_driven**：yosys 综合日志中出现 “multiple conflicting drivers”，或 verilator 报 MULTIDRIVEN
+7. **错误样本**：除 fragile_pass 外，每个样本都必须让题目自带的 tb 仿真失败（9.3 节自带 tb 得分 1.0 的前提）。只触发 blocking_in_seq / nonblocking_in_comb、仿真却正确的写法不放进 `cases/`，放在 `judge/tests/fixtures/` 里测试
+8. **内部信号**：problem.yaml 暂时没有字段标记“仅供观察、不参与比较”的信号，现有题目的 tb 都不打印内部信号
+9. **日志**：`logs/judge.jsonl` 每行 `{ts, type, problem, student, diagnosis}`（testbench 打分记录用 `result` 代替 `diagnosis`），路径可用环境变量 `JUDGE_LOG_PATH` 覆盖；题目目录可用 `JUDGE_PROBLEMS_DIR` 覆盖
+10. **testbench 打分**（9.3 节）：
+    - 命令行：`python -m judge <学生tb.v> <题目ID> --testbench`
+    - 学生 tb 的模块名不限，由 iverilog 自动找顶层；源码里（去掉注释后）必须有 `top_module` 的实例
+    - 输出在 9.3 节字段之外补充 `message`（失败时的中文说明，成功时为 null）和 `errors`（tb 编译报错，格式同 `compile.errors`）；失败时 `score` 为 null
+    - 错误样本在学生 tb 下编译失败、仿真超时或轨迹与参考答案不同，都算“抓住”
+    - `score` 保留 4 位小数；可计入的样本数为 0 时为 null
+    - 所有仿真都带 `vvp -none`，tb 里的 `$dumpvars` 不会写波形文件
+11. **日志记录类型**：`logs/judge.jsonl` 每行带 `type`（`diagnose` / `score_testbench`）
+12. **信号 → 代码行（9.1 节）**：
+    - 试验结论（yosys 0.33）：`proc` 之后，连续赋值和运算符单元的 src 能精确到行；组合 always 块里的 if / case 只给到整条 if / case 语句的范围；时序块里寄存器的触发器单元 src 是整个 always 块；赋常数的语句（如 `q <= 0`）没有任何单元记录
+    - 做法：先用 yosys 从信号出发、沿内部连线往回找驱动单元，得到候选行范围；再用 `judge/vparse.py` 的词法扫描，在候选范围内只保留这个信号出现在赋值号左边的行。连续赋值（`assign`、`wire` 声明赋值）不受候选范围限制；子模块例化的输出取例化语句所在行；yosys 读不进的代码（如不可综合的 while）只用词法扫描结果
+    - 扫描失败或某个信号一行都找不到时，退回 yosys 的候选范围，`drivers_granularity` 记为 `"block"`，否则为 `"statement"`；编译失败时 `drivers` 为 `{}`、`drivers_granularity` 为 null
+    - `drivers` 包含除输入端口外的所有具名信号（输出、内部 reg / wire），键按字母序
+13. **顺序打乱实验（9.2 节）**：
+    - 试验结论（iverilog 12）：交换源码里 always 块的先后会改变 iverilog 的执行顺序；`race_blocking.v` 结果随之改变，`race_nonblocking.v` 不变
+    - 命令行：`python -m judge <学生代码.v> <题目ID> --shuffle`；库：`shuffle_test(code, problem_id)`，`apply_shuffle(diagnosis, shuffle)` 在顺序相关时给诊断加上 race_order_sensitive
+    - 块数 ≤ 3 时穷举全部排列；更多时取倒序、左移、右移、两两交换和固定种子的随机排列，含原顺序共 6 种
+    - 输出在 9.2 节字段之外补充：`ok`、`message`（失败或无需实验时的中文说明）、`block_lines`（各 always 块在原文件中的起止行，`order` 里的编号即对应这里的下标 +1）、`base_trace`（原顺序的仿真轨迹）；`variants` 每项补充 `timeout`、`errors`（变体编译报错，行号已映射回原文件）和 `trace`（该排列的仿真轨迹，前端 diff 模式用）。变体超时或编译失败也算顺序相关
+    - 原代码编译失败或仿真超时时 `ok` 为 false、`order_sensitive` 为 null
+14. **资源限制（阶段 6）**：Linux 上每个外部命令经 `prlimit` 限制 CPU 时间（超时秒数 + 5）、内存（`JUDGE_MEMORY_MB`，默认 2048）、写文件大小（`JUDGE_OUTPUT_MB`，默认 32）；工具输出先写临时文件，所以输出量也受这个上限约束。超出 CPU 或输出上限按超时处理（`sim.timeout` 为 true，与第 3 条一致），输出 JSON 字段不变。`JUDGE_RLIMITS=0` 关闭；没有 prlimit 的系统自动不加限制。详见 docs/deploy.md 第 5 节

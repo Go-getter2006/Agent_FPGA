@@ -1,0 +1,14 @@
+.git
+**/__pycache__
+**/*.pyc
+**/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/e2e/screenshots
+logs
+backend/*.db*
+backend/exports
+backend/eval/results
+backups
+.env
