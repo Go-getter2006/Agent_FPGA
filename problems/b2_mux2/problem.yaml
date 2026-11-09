@@ -1,0 +1,15 @@
+id: b2_mux2
+title: 入门 2：二选一选择器
+knowledge_points: [comb_assign]
+primm_type: modify
+difficulty: 1
+order: 2
+stage: beginner
+starter: starter.v
+predict_points:
+  - {signal: y, steps: [1, 2, 4, 6]}
+hardware_questions: [ff_count, latch]
+expected_ff_count: 0        # 纯组合电路
+expected_drivers:
+  y: [10]
+modify_goal: "让 sel 起作用：sel 为 0 时输出 a，sel 为 1 时输出 b"

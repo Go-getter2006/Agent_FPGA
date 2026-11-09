@@ -74,6 +74,14 @@ class ClassData:
     def by_id(self) -> dict[int, Student]:
         return {s.user_id: s for s in self.students}
 
+    def answer_reveals(self) -> dict[tuple[int, str], datetime]:
+        """每个学生每道题第一次看参考答案（4 级提示）的时间。"""
+        out: dict[tuple[int, str], datetime] = {}
+        for h, a in self.hints:
+            if h.level == 4 and ((a.user_id, a.problem_id) not in out or h.created_at < out[(a.user_id, a.problem_id)]):
+                out[(a.user_id, a.problem_id)] = h.created_at
+        return out
+
     def in_group(self, group: str | None) -> set[int]:
         return {s.user_id for s in self.students if not group or group == "all" or s.group == group}
 
@@ -128,10 +136,13 @@ def load(db: DbSession, class_id: int, now: datetime | None = None) -> ClassData
 def views(cd: ClassData, *, users: set[int] | None = None, kp: str | None = None, problem: str | None = None,
           before: datetime | None = None, after: datetime | None = None) -> dict[int, list[AttemptView]]:
     theta = get_settings().pred_threshold
+    revealed = cd.answer_reveals()
     out: dict[int, list[AttemptView]] = defaultdict(list)
     for a in cd.attempts:
         if a.quadrant not in QUADRANTS:
             continue
+        if (a.user_id, a.problem_id) in revealed and a.created_at > revealed[(a.user_id, a.problem_id)]:
+            continue                 # 看过参考答案之后的尝试不计入掌握度（services/answer.py）
         if users is not None and a.user_id not in users:
             continue
         if problem and a.problem_id != problem:

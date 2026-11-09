@@ -20,6 +20,13 @@ const caseCode = (name: string) => {
   return lines.slice(lines.findIndex((l) => !l.startsWith('//'))).join('\n')
 }
 
+// 做题页第一次打开会自动弹出分步引导；除了专门测引导的用例，都当作已经看过
+test.beforeEach(async ({ context }, info) => {
+  if (!info.title.includes('分步引导')) {
+    await context.addInitScript(() => { try { window.localStorage.setItem('tour.workbench.v1', '1') } catch { /* 忽略 */ } })
+  }
+})
+
 async function login(page: Page, user: string) {
   await page.goto('/login')
   await page.getByTestId('login-name').fill(user)
@@ -99,7 +106,7 @@ test('学生从登录走完一道创作题的全部步骤', async ({ page }) => 
   await expect(page.getByTestId('quadrant-badge')).toBeVisible()
   await expect(page.getByTestId('pred-accuracy')).toContainText('预测准确率')
 
-  // 提示阶梯：1 级定位
+  // 提示阶梯：1 级思路（问题里点出第 5 步）
   await page.getByTestId('hint-request').click()
   await expect(page.getByTestId('hint-1')).toContainText('第 5 步')
 
@@ -173,7 +180,7 @@ test('关键页面的布局与原型一致', async ({ page }) => {
   // 学生端顶部导航 56px，四个入口
   const nav = await page.locator('.topnav').boundingBox()
   expect(nav!.height).toBe(56)
-  await expect(page.locator('.topnav nav a')).toHaveText(['学习首页', '题目', '复习', '我的学情'])
+  await expect(page.locator('.topnav nav a')).toHaveText(['学习首页', '新手入门', '题目', '复习', '我的学情'])
 
   // 我的学情：一行 4 张概览卡；掌握图 : 趋势图 = 7 : 5；底部三栏
   await page.goto('/student/report')
@@ -187,18 +194,32 @@ test('关键页面的布局与原型一致', async ({ page }) => {
   await expect(page.locator('.g-5-4-4 > .card')).toHaveCount(3)
   await expect(page.getByText('这里不显示排名，也不和同学比较。')).toBeVisible()
 
-  // 做题工作台：顶栏 56px；左栏 320px、右栏 360px；中栏上编辑器、下波形
+  // 做题工作台：顶栏 56px；三栏可以拖动调宽（左右栏默认约 1/4）；中栏上编辑器、下波形
   await page.goto(`/student/problems/${PID}`)
   await expect(page.getByTestId('workbench')).toBeVisible()
   const top = await page.locator('.ws-top').boundingBox()
   expect(top!.height).toBe(56)
+  await expect(page.getByTestId('next-step')).toContainText('下一步')
   const left = await page.getByTestId('col-left').boundingBox()
   const center = await page.getByTestId('col-center').boundingBox()
   const right = await page.getByTestId('col-right').boundingBox()
-  expect(Math.round(left!.width)).toBe(320)
-  expect(Math.round(right!.width)).toBe(360)
+  expect(left!.width).toBeGreaterThan(280)
+  expect(left!.width).toBeLessThan(center!.width)
+  expect(right!.width).toBeLessThan(center!.width)
   expect(left!.x).toBeLessThan(center!.x)
   expect(center!.x + center!.width).toBeLessThan(right!.x)
+  // 拖动左栏右边的分隔条，左栏变宽；题目说明完整显示，左栏可以上下滚动
+  const bar = page.locator('.ws-body > .ant-splitter > .ant-splitter-bar').first().locator('.ant-splitter-bar-dragger')
+  const bb = (await bar.boundingBox())!
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bb.x + 140, bb.y + bb.height / 2, { steps: 5 })
+  await page.mouse.up()
+  const wider = await page.getByTestId('col-left').boundingBox()
+  expect(wider!.width).toBeGreaterThan(left!.width + 80)
+  await expect(page.getByTestId('spec-card')).toContainText('端口')
+  const scroll = await page.getByTestId('col-left').evaluate((el) => getComputedStyle(el).overflowY)
+  expect(scroll).toBe('auto')
   const editor = await page.locator('.card.editor').boundingBox()
   const dock = await page.locator('.card.dock').boundingBox()
   expect(editor!.y).toBeLessThan(dock!.y)
@@ -209,7 +230,7 @@ test('关键页面的布局与原型一致', async ({ page }) => {
   expect(titles.map((t) => t.split(/\s/)[0])).toEqual(['本题状态', '提示', '问助教'])
 
   // 窗口太窄时提示在电脑上做题；“我的学情”“复习”在手机上单列显示、不出现横向滚动
-  await page.setViewportSize({ width: 1024, height: 800 })
+  await page.setViewportSize({ width: 1000, height: 800 })
   await expect(page.getByTestId('narrow')).toContainText('请在电脑上做题')
   await page.setViewportSize({ width: 390, height: 844 })
   for (const path of ['/student/report', '/student/review']) {
@@ -281,5 +302,84 @@ test('大模型不可用时：提示和对话都换成简化提示，照常做�
   await page.getByTestId('chat-input').fill('第 5 步为什么对不上？')
   await page.getByTestId('chat-send').click()
   await expect(page.getByTestId('chat-reply').last()).toContainText('当前为简化提示')
-  await expect(page.getByTestId('chat-panel').locator('.card-h small')).toHaveText('当前为简化提示，不影响仿真和判定')
+  await expect(page.getByTestId('chat-panel').locator('.card-h small')).toContainText('当前为简化提示，不影响仿真和判定')
+})
+
+test('新手入门：入门课、小测、分步引导、下一步高亮、术语解释', async ({ page }) => {
+  await login(page, 'S2026005')
+  await page.getByTestId('consent-accept').click()
+  await page.waitForURL('**/student')
+  await page.getByTestId('start-learn').click()
+  await expect(page.getByTestId('learn')).toContainText('FPGA 和 Verilog 是什么')
+  await page.getByTestId('lesson-what-is-fpga').click()
+  const quiz = page.getByTestId('quiz').first()
+  await quiz.getByTestId('quiz-option').nth(1).click()          // 第 1 题选对
+  await expect(quiz).toContainText('答对了')
+  await page.getByTestId('lesson-next').click()
+  // 第 2 课的电路示意：点一下输入格子，输出跟着变
+  const demo = page.getByTestId('demo')
+  const before = await demo.locator('svg').innerHTML()
+  await demo.getByTestId('demo-cell').first().click()
+  expect(await demo.locator('svg').innerHTML()).not.toBe(before)
+  // 入门题排在题目列表最前面，带“入门”标记
+  await page.goto('/student/problems')
+  await expect(page.locator('tbody tr').first()).toContainText('入门')
+  await expect(page.locator('tbody tr').first()).toContainText('与门')
+
+  // 第一次进入做题页：自动弹出分步引导，走完 8 步
+  await page.goto('/student/problems/b1_and_gate')
+  const tour = page.locator('.ant-tour')
+  await expect(tour).toContainText('欢迎来到做题页')
+  for (let i = 0; i < 7; i++) await tour.getByRole('button', { name: /下一步/ }).click()
+  await tour.getByRole('button', { name: /结束引导|完成|结束/ }).click()
+  await expect(tour).toBeHidden()
+  // 下一步提示：先填波形 → 波形区闪烁；术语鼠标移上去有解释
+  await expect(page.getByTestId('next-step')).toContainText('波形预测')
+  await expect(page.locator('.card.dock.pulse-box')).toBeVisible()
+  await page.getByTestId('term').filter({ hasText: '触发器' }).first().hover()
+  await expect(page.locator('.ant-popover')).toContainText('能记住 1 位')
+  // 预测题没有参考答案这一级
+  await expect(page.getByTestId('answer-card')).toHaveCount(0)
+  // 界面事件是分批上报的：等它们写进事件日志
+  await expect.poll(() => eventTypes('S2026005'), { timeout: 30_000 })
+    .toEqual(expect.arrayContaining(['lesson.open', 'lesson.quiz', 'tour.done']))
+})
+
+test('参考答案：提交 3 次没通过并看过代码提示后解锁', async ({ page }) => {
+  await login(page, 'S2026006')
+  await page.getByTestId('consent-accept').click()
+  await page.waitForURL('**/student')
+  await page.goto(`/student/problems/${PID}`)
+  await expect(page.getByTestId('answer-card')).toContainText('再提交 3 次')
+  // 用接口快速提交 3 次错误代码，并要到 3 级代码提示
+  const aid = await page.evaluate(async ([pid, code]) => {
+    const call = async (m: string, u: string, b?: unknown) => (await fetch(u, { method: m, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })).json()
+    const d = await call('GET', `/api/student/problems/${pid}`)
+    let last = 0
+    for (let i = 0; i < 3; i++) {
+      const cells = d.predict_points.flatMap((p: any) => p.steps.map((s: number) => ({ signal: p.signal, step: s, value: '0' })))
+      await call('POST', `/api/student/problems/${pid}/predictions`, { waveform: { cells }, hardware: { ff_count: 2, latch: false, ff_signals: [] } })
+      last = (await call('POST', `/api/student/problems/${pid}/attempts`, { code })).attempt_id
+      for (let k = 0; k < 120; k++) {
+        if ((await call('GET', `/api/student/attempts/${last}`)).status === 'done') break
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    }
+    for (let lv = 0; lv < 3; lv++) {
+      await call('POST', `/api/student/attempts/${last}/hints`)
+      await call('POST', `/api/student/attempts/${last}/investigations`, { kind: 'locate_step', chosen: { step: 0, signal: 'out' } })
+    }
+    return last
+  }, [PID, caseCode('c1_no_overlap.v')] as const)
+  expect(aid).toBeGreaterThan(0)
+  await page.reload()
+  await expect(page.getByTestId('hint-3').getByTestId('code-block')).toContainText('____')
+  await page.getByTestId('answer-open').click()
+  await page.getByRole('button', { name: '看参考答案', exact: true }).click()
+  await expect(page.locator('.ant-modal').filter({ hasText: '参考答案' }).getByTestId('code-block')).toContainText('S101')
+  await expect(page.locator('.ant-modal-confirm')).toHaveCount(0)
+  await page.waitForTimeout(400)                       // 等弹窗动画结束再截图
+  await page.screenshot({ path: `${SHOTS}/answer.png` })
+  expect(eventTypes('S2026006')).toContain('answer.reveal')
 })

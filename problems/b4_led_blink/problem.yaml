@@ -1,0 +1,15 @@
+id: b4_led_blink
+title: 入门 4：让 LED 闪起来（计数分频）
+knowledge_points: [counter, sequential]
+primm_type: make
+difficulty: 1
+order: 4
+stage: beginner
+starter: null
+predict_points:
+  - {signal: led, steps: [3, 4, 8, 13]}
+hardware_questions: [ff_count, latch, ff_signals]
+expected_ff_count: 3        # cnt 两位 + led 一位
+expected_drivers:
+  led: [14, 18]
+modify_goal: ""

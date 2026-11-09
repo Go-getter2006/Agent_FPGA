@@ -49,7 +49,7 @@ export default function Problems() {
               <tbody>
                 {q.data.items.map((p) => (
                   <tr key={p.id} data-testid={`problem-row-${p.id}`}>
-                    <td><Link to={`/student/problems/${p.id}`}>{p.title}</Link></td>
+                    <td>{p.stage === 'beginner' && <span className="chip green" style={{ marginRight: 6 }}>入门</span>}<Link to={`/student/problems/${p.id}`}>{p.title}</Link></td>
                     <td>{p.knowledge_points.map((k) => <span key={k.code} className="chip" style={{ marginRight: 4 }}>{k.name.replace(/（.*）/, '')}</span>)}</td>
                     <td><span className="chip blue">{p.primm_label}</span></td>
                     <td aria-label={`难度 ${p.difficulty}`}>{'●'.repeat(p.difficulty)}<span className="muted">{'●'.repeat(3 - p.difficulty)}</span></td>

@@ -84,7 +84,9 @@ $$B=\frac{N_{\text{blind}}}{N_{\text{resubmit}}}$$
 ### 4.4 提示依赖度 H
 $$H=\frac{1}{|P|}\sum_{j\in P}h_j$$
 
-其中，$P$ 为该学生已通过的题目集合，$h_j$ 为通过题 $j$ 之前请求过的最高提示等级（0–3，没请求过记 0）。
+其中，$P$ 为该学生已通过的题目集合，$h_j$ 为通过题 $j$ 之前请求过的最高提示等级（0–4，没请求过记 0；4 表示看过参考答案，见 docs/llm-deepseek.md 5.4 节）。
+
+看过某题参考答案之后提交的尝试，不计入任何知识点的掌握等级、F 值和 R 值。
 
 ### 4.5 testbench 得分
 定义见 docs/judge.md 9.3 节的 $S_{\text{tb}}$，取每道创作题最近一次提交。
@@ -142,12 +144,15 @@ $$H=\frac{1}{|P|}\sum_{j\in P}h_j$$
 | investigate.locate_step / investigate.locate_line | attempt_id、chosen、correct |
 | explain.submit | attempt_id、length |
 | hint.request / hint.shown | attempt_id、level；shown 时加 source（llm / fallback）、hint_id |
+| answer.reveal / answer.view | 第一次查看参考答案（hint_id、failed、passed_before）/ 之后再看 |
+| lesson.open / lesson.quiz | 新手入门课：打开一节课（lesson）/ 答课内小测（lesson、question、choice、correct）；小测只用于自学，不计入学情指标 |
+| tour.done | 看完或关掉做题页的分步引导（finished） |
 | chat.send / chat.reply | session_id、length；reply 时加 llm_call_id |
 | shuffle.run | attempt_id、order_sensitive |
 | tb.submit | score、caught、missed |
 | review.answer | item_id、correct、box |
 
-前端产生的界面事件（波形查看、格子点击）批量上报，每 5 秒或满 20 条发一次。
+前端产生的界面事件（波形查看、格子点击、入门课）批量上报，每 5 秒或满 20 条发一次；离开页面时用 sendBeacon 把剩下的发出去。
 
 ## 8. 实验分组与功能开关
 - 每个学生在班级里属于一个分组：treatment（实验组）、control（对照组）或 none

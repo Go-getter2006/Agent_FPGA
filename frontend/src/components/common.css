@@ -17,3 +17,37 @@
 .badge { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; background: #FAFAFA; }
 .badge .ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #DCFCE7; color: var(--c-success); font-weight: 700; }
 @media (max-width: 768px) { .mmap { grid-template-columns: repeat(2, 1fr); } }
+
+/* Markdown（题目说明、提示、助教回复、入门课） */
+.md h3.md-h { font-size: 15px; margin: 10px 0 6px; }
+.md h4.md-h { font-size: 13px; margin: 8px 0 4px; }
+.md-p { margin: 4px 0; white-space: pre-line; }
+.md-ul, .md-ol { margin: 4px 0; padding-left: 20px; }
+.md-ul li, .md-ol li { margin: 2px 0; }
+.md-quote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid #C7D2FE; color: #4B5563; background: #F8FAFF; white-space: pre-line; }
+.md-table-wrap { overflow-x: auto; }
+.md-table { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+.md-table th, .md-table td { border: 1px solid var(--c-border); padding: 2px 6px; text-align: left; }
+.md-table th { background: #FAFAFB; font-weight: 500; white-space: nowrap; }
+.md-code { font-family: var(--mono); font-size: 12px; background: #F3F4F6; padding: 0 4px; border-radius: 3px; }
+
+/* 代码块：Verilog 高亮；____ 是留给学生填的空 */
+.code-block { border: 1px solid var(--c-border); border-radius: 6px; margin: 6px 0; background: #F8FAFC; overflow: hidden; }
+.code-block .cb-h { display: flex; justify-content: space-between; align-items: center; padding: 2px 8px; font-size: 11px;
+  color: var(--c-text-2); border-bottom: 1px solid var(--c-border); background: #F1F5F9; }
+.code-block .cb-h button { border: 0; background: transparent; color: var(--c-primary); cursor: pointer; font-size: 11px; }
+.code-block pre { margin: 0; padding: 8px 10px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: #111827; }
+.hl-k { color: #1D4ED8; font-weight: 600; }
+.hl-c { color: #6B7280; font-style: italic; }
+.hl-n { color: #B45309; }
+.hl-s { color: #047857; }
+.hl-f { color: #9333EA; }
+.hl-blank { background: #FEF3C7; color: #92400E; border-bottom: 1px dashed #D97706; }
+
+/* 术语：鼠标移上去看解释 */
+.term { border-bottom: 1px dashed #93A3B8; cursor: help; }
+.chip.green { background: #DCFCE7; color: #166534; }
+/* 等宽字体不要连字：<= 必须显示成 <=，不能变成 ≤ */
+code, pre, .md-code, .code-block pre, .monaco-editor { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+/* 弹窗里的长代码（参考答案）在框内滚动 */
+.ant-modal .code-block pre { max-height: 62vh; overflow: auto; }

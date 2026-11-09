@@ -132,7 +132,7 @@ def test_llm_hint_valid(fake_llm, attempt):
     before = len(calls())
     hint = client.post(f"/api/student/attempts/{aid}/hints").json()
     assert hint["source"] == "llm" and hint["level"] == 1 and hint["fallback_reason"] is None
-    assert hint["prompt_version"] == "hint_v1" and hint["focus"]["lines"] == [16]
+    assert hint["prompt_version"] == "hint_v2" and hint["focus"]["lines"] == [16]
     req = server.requests[0]
     body = req["body"]
     # 请求参数：模型名来自配置；关闭思考；JSON Output；system → 本题信息 → 本次诊断
@@ -147,7 +147,7 @@ def test_llm_hint_valid(fake_llm, attempt):
     new = calls()[before:]
     assert len(new) == 1
     log = new[0]
-    assert log.purpose == "hint" and log.prompt_version == "hint_v1" and log.status == "ok" and log.model == "deepseek-flash"
+    assert log.purpose == "hint" and log.prompt_version == "hint_v2" and log.status == "ok" and log.model == "deepseek-flash"
     assert log.tokens == {"prompt": 100, "completion": 20, "cache_hit": 70, "cache_miss": 30}
     assert log.cost_cny == pytest.approx((70 * 0.04 + 30 * 2 + 20 * 8) / 1e6)
     assert log.validation["ok"] is True
@@ -178,7 +178,7 @@ def test_invalid_twice_falls_back(fake_llm, attempt):
     _, client, aid = attempt
     hint = client.post(f"/api/student/attempts/{aid}/hints").json()
     assert hint["source"] == "fallback" and hint["fallback_reason"] == "invalid"
-    assert hint["message"].startswith("先看第 5 步的 out")          # 规则提示
+    assert hint["template"] == "sim_mismatch.v2.1" and "对照期望波形" in hint["message"]   # 规则提示：1 级思路
     assert hint["question"].endswith("？")
 
 
@@ -304,7 +304,7 @@ def test_chat_streams_and_logs(fake_llm, attempt):
     assert roles[:3] == ["system", "user", "user"] and roles[-1] == "user"
     assert "【最近一次诊断】" in body["messages"][2]["content"]
     log = calls()[-1]
-    assert log.purpose == "chat" and log.prompt_version == "chat_v1" and log.tokens["cache_hit"] == 40
+    assert log.purpose == "chat" and log.prompt_version == "chat_v2" and log.tokens["cache_hit"] == 40
     history = client.get(f"/api/student/problems/{PID}/chat").json()["messages"]
     assert [m["role"] for m in history[-2:]] == ["user", "assistant"]
     assert {"chat.send", "chat.reply"} <= set(event_types(user.id))
@@ -316,18 +316,30 @@ def test_chat_streams_and_logs(fake_llm, attempt):
 
 
 def test_chat_stops_when_code_leaks(fake_llm, attempt):
-    fake_llm([sse_body(["看第 16 行。\n", "可以改成：\n```verilog\n", "assign out = 1;\n```"])])
+    """第 2 版：原样写出参考答案里的语句就停止转发；没写完的代码行先不发，所以半行也不会漏出去。"""
+    fake_llm([sse_body(["看第 16 行。\n", "可以改成：\n```verilog\n", "assign out = (st", "ate == S101);\n```"])])
     _, client, aid = attempt
     evs = _events(client.post(f"/api/student/problems/{PID}/chat", json={"message": "直接告诉我答案"}).text)
     text = "".join(e.get("delta", "") for e in evs)
-    assert "```" not in text and "assign out" not in text
-    assert text.endswith("助教不能直接给出代码，换个问法试试看")
+    assert "assign out" not in text and "S101" not in text
+    assert text.endswith("可以在提示区解锁参考答案）")
     assert evs[-1]["flagged"] is True
     with SessionLocal() as db:
         msg = db.scalar(select(ChatMessage).order_by(ChatMessage.id.desc()))
         assert msg.flagged and msg.role == "assistant"
     log = calls()[-1]
-    assert log.status == "blocked" and "```" in log.output        # 原始输出留作研究记录
+    assert log.status == "blocked" and "S101" in log.output        # 原始输出留作研究记录
+
+
+def test_chat_allows_markdown_and_code_framework(fake_llm, attempt):
+    """代码框架（带 ____）和与本题不同的小例子可以给；Markdown 原样转发给前端渲染。"""
+    reply = ["**思路**：状态寄存器在时钟沿更新。\n", "```verilog\n", "always @(posedge clk) begin\n",
+             "    if (rst) state <= ____;\n", "    else     state <= ____;\n", "end\n```\n", "试试看？"]
+    fake_llm([sse_body(reply)])
+    _, client, aid = attempt
+    evs = _events(client.post(f"/api/student/problems/{PID}/chat", json={"message": "状态寄存器怎么写"}).text)
+    assert "".join(e.get("delta", "") for e in evs) == "".join(reply)
+    assert evs[-1]["flagged"] is False
 
 
 def test_chat_hourly_limit(fake_llm, student, monkeypatch):

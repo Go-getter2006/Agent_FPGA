@@ -250,7 +250,7 @@ def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, wee
                 if not sim_ok and rng.random() < 0.6:
                     for level in range(1, rng.randrange(2, 5)):
                         ht = t + timedelta(minutes=2 + level)
-                        content = fallback_hints.generate(diag, level, evaluation=evaluation, quadrant=q)
+                        content = fallback_hints.generate_v2(diag, level, evaluation=evaluation, quadrant=q)
                         content["fallback_reason"] = "no_key"
                         h = Hint(attempt_id=a.id, level=level, source="fallback", content=content, created_at=ht)
                         db.add(h)

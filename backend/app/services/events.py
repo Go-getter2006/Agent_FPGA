@@ -13,6 +13,8 @@ from ..models import Enrollment, Event, User
 # 前端可以批量上报的界面事件；其余事件只由后端在对应操作里写
 CLIENT_EVENT_TYPES = frozenset({
     "page.view", "step.enter", "problem.open", "waveform.view", "waveform.cell_click",
+    # 新手入门（第 2 版）：打开一节课、答课内小测、看完做题页分步引导
+    "lesson.open", "lesson.quiz", "tour.done",
 })
 
 

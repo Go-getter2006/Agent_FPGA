@@ -178,3 +178,4 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
     - 输出在 9.2 节字段之外补充：`ok`、`message`（失败或无需实验时的中文说明）、`block_lines`（各 always 块在原文件中的起止行，`order` 里的编号即对应这里的下标 +1）、`base_trace`（原顺序的仿真轨迹）；`variants` 每项补充 `timeout`、`errors`（变体编译报错，行号已映射回原文件）和 `trace`（该排列的仿真轨迹，前端 diff 模式用）。变体超时或编译失败也算顺序相关
     - 原代码编译失败或仿真超时时 `ok` 为 false、`order_sensitive` 为 null
 14. **资源限制（阶段 6）**：Linux 上每个外部命令经 `prlimit` 限制 CPU 时间（超时秒数 + 5）、内存（`JUDGE_MEMORY_MB`，默认 2048）、写文件大小（`JUDGE_OUTPUT_MB`，默认 32）；工具输出先写临时文件，所以输出量也受这个上限约束。超出 CPU 或输出上限按超时处理（`sim.timeout` 为 true，与第 3 条一致），输出 JSON 字段不变。`JUDGE_RLIMITS=0` 关闭；没有 prlimit 的系统自动不加限制。详见 docs/deploy.md 第 5 节
+15. **题目目录的可选内容（2026-11）**：`skeleton.v` 是给学生看的代码框架（`____` 处留空），第 3 级规则提示会用到；`problem.yaml` 可加 `order`（题目列表里的顺序，默认 100，入门题是 1–4）和 `stage: beginner`（入门题）。这三项都不影响裁判输出。入门题 4 道：`b1_and_gate`、`b2_mux2`、`b3_dff_en`、`b4_led_blink`，样本要求与其他题相同

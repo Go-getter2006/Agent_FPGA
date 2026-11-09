@@ -15,6 +15,18 @@ export default function Home() {
   return (
     <div className="page" data-testid="home">
       <div className="page-h"><h1>你好，{d.user.display_name}</h1><span className="muted">今天也来练一练</span></div>
+      <div className="card beginner-banner" data-testid="beginner-banner">
+        <div className="card-b">
+          <div>
+            <b>第一次学 Verilog 和 FPGA？</b>
+            <div className="muted">先花半小时学完 6 节新手入门课，再按顺序做 4 道入门题：与门 → 选择器 → 寄存器 → 让 LED 闪起来。</div>
+          </div>
+          <div className="bb-actions">
+            <Button type="primary" onClick={() => navigate('/student/learn')} data-testid="start-learn">开始入门课</Button>
+            <Button onClick={() => navigate('/student/problems/b1_and_gate')}>直接做第 1 道入门题</Button>
+          </div>
+        </div>
+      </div>
       <div className="grid home-grid responsive">
         <div className="card">
           <div className="card-h">本周作业 {d.continue && <Button type="primary" size="small" onClick={() => navigate(`/student/problems/${d.continue!.problem_id}`)}

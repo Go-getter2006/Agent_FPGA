@@ -14,7 +14,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..models import (Assignment, Attempt, ChatMessage, Event, Explanation, Hint, Investigation, KnowledgePoint,
                       Prediction, Problem, Progress, ReviewItem, ShuffleRun, TbSubmission, User)
-from ..services import chat, jobs, llm_hints, review_scheduler, workflow
+from ..services import answer, chat, jobs, llm_hints, review_scheduler, workflow
 from ..services.llm import get_llm
 from ..services.events import CLIENT_EVENT_TYPES, log_event, primary_enrollment
 from ..services.flags import flags_for_user
@@ -135,7 +135,8 @@ def list_problems(assignment_id: int | None = None, kp: str | None = None, statu
     rows = []
     kp_order = {k.code: k.sort_order for k in db.scalars(select(KnowledgePoint)).all()}
     problems = sorted(db.scalars(select(Problem)).all(),
-                      key=lambda p: (min((kp_order.get(k, 99) for k in p.knowledge_points), default=99),
+                      key=lambda p: (p.meta.get("order", 100),
+                                     min((kp_order.get(k, 99) for k in p.knowledge_points), default=99),
                                      p.difficulty, p.id))
     for p in problems:
         if allowed is not None and p.id not in allowed:
@@ -145,7 +146,7 @@ def list_problems(assignment_id: int | None = None, kp: str | None = None, statu
         st = _status(db, user.id, p.id)
         if status and st != status:
             continue
-        rows.append({"id": p.id, "title": p.title, "primm_type": p.primm_type,
+        rows.append({"id": p.id, "title": p.title, "primm_type": p.primm_type, "stage": p.meta.get("stage") or "",
                      "primm_label": PRIMM_LABEL[p.primm_type], "difficulty": p.difficulty,
                      "knowledge_points": [{"code": k, "name": names.get(k, k)} for k in p.knowledge_points],
                      "status": st, "due_at": due_by_problem.get(p.id)})
@@ -207,6 +208,8 @@ def problem_detail(pid: str, user: User = Depends(student_user), db: DbSession =
                                for x in pending],
         "latest_tb": _tb_payload(latest_tb) if latest_tb else None,
         "flags": flags,
+        "stage": meta.get("stage") or "",
+        "answer": answer.status(db, user.id, p),
     }
 
 
@@ -352,8 +355,8 @@ def attempt_detail(aid: int, user: User = Depends(student_user), db: DbSession =
     out["expected"] = p.meta["ref_trace"]
     if a.judge["compile"]["ok"]:
         out["investigation"] = workflow.investigation_status(db, a, evaluation)
-    out["hints"] = [_hint_payload(h) for h in db.scalars(select(Hint).where(Hint.attempt_id == a.id)
-                                                         .order_by(Hint.level)).all()]
+    out["hints"] = [_hint_payload(h) for h in db.scalars(select(Hint).where(
+        Hint.attempt_id == a.id, Hint.level < answer.ANSWER_LEVEL).order_by(Hint.level)).all()]
     run = db.scalar(select(ShuffleRun).where(ShuffleRun.attempt_id == a.id).order_by(ShuffleRun.id.desc()))
     if run is not None:
         out["shuffle"] = {"id": run.id, "status": run.status, "prediction": run.prediction, "result": run.result}
@@ -439,10 +442,11 @@ def request_hint(aid: int, user: User = Depends(student_user), db: DbSession = D
     a = _attempt(db, user, aid)
     if a.status != "done":
         raise ApiError(409, "NOT_READY", "等仿真结果出来再要提示")
-    existing = db.scalars(select(Hint).where(Hint.attempt_id == a.id).order_by(Hint.level)).all()
+    existing = db.scalars(select(Hint).where(Hint.attempt_id == a.id, Hint.level < answer.ANSWER_LEVEL)
+                          .order_by(Hint.level)).all()
     level = (existing[-1].level if existing else 0) + 1
     if level > 3:
-        raise ApiError(409, "HINT_MAX", "已经是最高一级提示了，试着按提示改一改再运行")
+        raise ApiError(409, "HINT_MAX", "已经是最高一级提示了，试着按提示改一改再运行；实在不会可以看参考答案")
     last_hint = db.scalar(select(Hint).join(Attempt, Attempt.id == Hint.attempt_id).where(
         Attempt.user_id == user.id, Attempt.problem_id == a.problem_id).order_by(Hint.created_at.desc()))
     if last_hint is not None and existing:
@@ -473,6 +477,38 @@ def request_hint(aid: int, user: User = Depends(student_user), db: DbSession = D
                        "fallback_reason": out["fallback_reason"]})
     db.commit()
     return _hint_payload(hint)
+
+
+# ---------------------------------------------------------------- 第 4 级：参考答案
+
+@router.post("/problems/{pid}/answer")
+def show_answer(pid: str, user: User = Depends(student_user), db: DbSession = Depends(get_db)):
+    """满足解锁条件时返回参考答案；第一次查看记一条 level=4 的提示（计入提示依赖度）。"""
+    p = _problem(db, pid)
+    st = answer.status(db, user.id, p)
+    if not st["available"]:
+        raise ApiError(409, "ANSWER_NA", st["message"])
+    if not st["unlocked"]:
+        raise ApiError(403, "ANSWER_LOCKED", st["message"])
+    first = not st["revealed"]
+    if first:
+        latest = _latest_attempt(db, user.id, pid)
+        passed_before = any(x.sim_ok for x in db.scalars(select(Attempt).where(
+            Attempt.user_id == user.id, Attempt.problem_id == pid, Attempt.status == "done")).all())
+        hint = Hint(attempt_id=latest.id, level=answer.ANSWER_LEVEL, source="answer", content={
+            "level": answer.ANSWER_LEVEL, "focus": {"step": None, "signal": None, "lines": []},
+            "message": "参考答案", "question": "", "concept_tags": [], "code": "",
+            "prompt_version": answer.ANSWER_VERSION})
+        db.add(hint)
+        db.flush()
+        log_event(db, user, "answer.reveal", problem_id=pid, attempt_id=latest.id,
+                  payload={"hint_id": hint.id, "failed": st["failed"], "passed_before": passed_before})
+    else:
+        log_event(db, user, "answer.view", problem_id=pid, payload={})
+    db.commit()
+    return {"code": p.meta.get("ref_code") or "", "first_time": first,
+            "note": "看过参考答案之后，这道题再提交的结果不计入掌握度。建议看懂后关掉答案，自己重新写一遍。",
+            "answer": answer.status(db, user.id, p)}
 
 
 # ---------------------------------------------------------------- 助教对话（SSE）

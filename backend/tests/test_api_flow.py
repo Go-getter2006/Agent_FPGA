@@ -214,19 +214,21 @@ def test_hint_ladder_and_interval(student):
     aid = attempt["id"]
     h1 = client.post(f"/api/student/attempts/{aid}/hints").json()
     assert h1["level"] == 1 and h1["source"] == "fallback" and h1["question"].endswith("？")
-    assert h1["tag"] == "latch_inferred" and "next_state" in h1["message"]
+    # 第 2 版：1 级思路（概念 + 类比，不点代码）→ 2 级定位 → 3 级代码提示
+    assert h1["tag"] == "latch_inferred" and "锁存器" in h1["message"] and h1["code"] == ""
     r = client.post(f"/api/student/attempts/{aid}/hints")
     assert r.status_code == 429 and r.json()["error"]["code"] == "HINT_TOO_SOON"
     # 中间做了一次定位操作，就可以要下一级
     client.post(f"/api/student/attempts/{aid}/investigations",
                 json={"kind": "locate_step", "chosen": {"step": 0, "signal": "out"}})
     h2 = client.post(f"/api/student/attempts/{aid}/hints").json()
-    assert h2["level"] == 2
+    assert h2["level"] == 2 and "next_state" in h2["message"]
     with SessionLocal() as db:   # 把上一条提示的时间往前拨，模拟过了 30 秒
         for h in db.scalars(select(Hint).where(Hint.attempt_id == aid)).all():
             h.created_at = utcnow() - timedelta(seconds=60)
         db.commit()
-    assert client.post(f"/api/student/attempts/{aid}/hints").json()["level"] == 3
+    h3 = client.post(f"/api/student/attempts/{aid}/hints").json()
+    assert h3["level"] == 3 and "____" in h3["code"] and "endmodule" not in h3["code"]
     r = client.post(f"/api/student/attempts/{aid}/hints")
     assert r.status_code == 409 and r.json()["error"]["code"] == "HINT_MAX"
     detail = client.get(f"/api/student/attempts/{aid}").json()
