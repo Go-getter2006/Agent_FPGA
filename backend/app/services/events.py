@@ -22,13 +22,13 @@ def primary_enrollment(db: DbSession, user_id: int) -> Enrollment | None:
 
 def log_event(db: DbSession, user: User | None, type_: str, *, problem_id: str | None = None,
               attempt_id: int | None = None, payload: dict | None = None,
-              ts: datetime | None = None) -> Event:
+              ts: datetime | None = None, class_id: int | None = None) -> Event:
     enrollment = primary_enrollment(db, user.id) if user is not None else None
     ev = Event(
         ts=ts or utcnow(),
         anon_id=user.anon_id if user is not None else None,
         user_id=user.id if user is not None else None,
-        class_id=enrollment.class_id if enrollment else None,
+        class_id=class_id if class_id is not None else (enrollment.class_id if enrollment else None),
         group=enrollment.group if enrollment else None,
         type=type_,
         problem_id=problem_id,

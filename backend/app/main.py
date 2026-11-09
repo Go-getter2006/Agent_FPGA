@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import auth, jobs, student
+from .api import auth, jobs, student, teacher
 from .api.deps import ApiError
 from .config import APP_VERSION
 from .db import SessionLocal
@@ -41,7 +41,7 @@ def create_app(sync_on_startup: bool = True) -> FastAPI:
         message = {404: "找不到这个地址"}.get(exc.status_code, str(exc.detail))
         return JSONResponse(status_code=exc.status_code, content={"error": {"code": code, "message": message}})
 
-    for router in (auth.router, student.router, jobs.router):
+    for router in (auth.router, student.router, teacher.router, jobs.router):
         app.include_router(router, prefix="/api")
 
     @app.get("/api/health")

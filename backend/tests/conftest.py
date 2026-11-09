@@ -12,6 +12,7 @@ os.environ["JOBS_INLINE"] = "1"
 os.environ["ANON_SALT"] = "test-salt"
 os.environ["JUDGE_LOG_PATH"] = str(_TMP / "judge.jsonl")
 os.environ["HINT_INTERVAL_SECONDS"] = "30"
+os.environ["EXPORTS_DIR"] = str(_TMP / "exports")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

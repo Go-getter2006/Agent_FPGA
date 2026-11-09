@@ -294,6 +294,35 @@ class ChatMessage(Base):
     created_at = mapped_column(UTCDateTime, default=utcnow)
 
 
+class AnalysisLabel(Base):
+    """离线 ICAP 编码（docs/learner-model.md 第 10 节）。标注“AI 编码”，不进入任何学生端指标。"""
+    __tablename__ = "analysis_labels"
+    __table_args__ = (Index("ix_analysis_target", "target_type", "target_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    target_type: Mapped[str] = mapped_column(String(16))        # explanation / chat_message
+    target_id: Mapped[int] = mapped_column(Integer)
+    scheme: Mapped[str] = mapped_column(String(16), default="ICAP")
+    label: Mapped[str] = mapped_column(String(4))               # P / A / C / I
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    llm_call_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sampled: Mapped[bool] = mapped_column(Boolean, default=False)   # 被抽中做人工抽检
+    human_label: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    human_labeler_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at = mapped_column(UTCDateTime, default=utcnow)
+
+
+class TeacherNote(Base):
+    __tablename__ = "teacher_notes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    text: Mapped[str] = mapped_column(Text)
+    created_at = mapped_column(UTCDateTime, default=utcnow)
+
+
 class AppendOnlyError(RuntimeError):
     pass
 

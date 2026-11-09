@@ -30,6 +30,20 @@ def execute(type_: str, payload: dict) -> dict:
         return shuffle_test(payload["code"], payload["problem_id"], student=student, timeout=timeout)
     if type_ == "tb":
         return score_testbench(payload["code"], payload["problem_id"], student=student, timeout=timeout)
+    if type_ in ("export", "icap"):
+        # 这两类任务要读写数据库：在任务进程里自己开会话
+        from ..db import SessionLocal
+        from .exports import build_export, exports_dir
+        from .icap import run_icap
+        from .llm import get_llm
+        from datetime import datetime
+        with SessionLocal() as db:
+            if type_ == "export":
+                path = exports_dir() / f"export_{payload['job_id']}.zip"
+                counts = build_export(db, payload["class_id"], payload["kinds"], path)
+                return {"path": str(path), "counts": counts}
+            parse = lambda v: datetime.fromisoformat(v) if v else None  # noqa: E731
+            return run_icap(db, get_llm(), payload["class_id"], parse(payload.get("from")), parse(payload.get("to")))
     raise ValueError(f"未知任务类型：{type_}")
 
 
@@ -40,6 +54,9 @@ def apply_result(db: DbSession, job: Job, output: dict) -> None:
         apply_shuffle_run(db, db.get(ShuffleRun, job.payload["shuffle_run_id"]), output)
     elif job.type == "tb":
         apply_tb(db, db.get(TbSubmission, job.payload["tb_submission_id"]), output)
+    if job.type in ("export", "icap"):
+        finish(db, job, output)
+        return
     finish(db, job, {"ok": True})
 
 
