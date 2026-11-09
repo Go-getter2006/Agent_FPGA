@@ -1,8 +1,15 @@
 # 部署：数据库、后端接口、判题进程、前端（nginx）。用法见 docs/deploy.md
-#   cp .env.example .env    # 填好密码、ANON_SALT、DEEPSEEK_API_KEY
+#   deploy/quickstart.sh                 # 一键：生成 .env、构建启动、导入演示数据
+# 或手动：
+#   cp .env.example .env                 # 填好 POSTGRES_PASSWORD、ANON_SALT，可选 DEEPSEEK_API_KEY
 #   docker compose up -d --build
 x-backend: &backend
-  build: { context: ., dockerfile: deploy/Dockerfile.backend }
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile.backend
+    args:
+      APT_MIRROR: ${APT_MIRROR:-}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
   image: agent-fpga-backend
   env_file: .env
   environment: &backend-env
@@ -44,7 +51,11 @@ services:
       JUDGE_WORKERS: ${JUDGE_WORKERS:-2}
 
   web:
-    build: { context: ., dockerfile: deploy/Dockerfile.web }
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: agent-fpga-web
     ports:
       - "${WEB_PORT:-8080}:80"

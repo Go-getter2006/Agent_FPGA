@@ -22,7 +22,8 @@ python -m backend.worker                              # 判题任务
 环境变量见 `.env.example`（只写变量名和默认值）。
 
 ## 部署
-见 [docs/deploy.md](docs/deploy.md)：`cp .env.example .env`，填好密码和盐，`docker compose up -d --build`；备份恢复用 `deploy/backup.sh` / `deploy/restore.sh`。
+装好 Docker 后运行 `deploy/quickstart.sh`：自动生成配置、构建启动、导入演示数据并打印账号，然后打开 http://localhost:8080 。
+正式部署、国内镜像源、备份恢复见 [docs/deploy.md](docs/deploy.md)。
 
 ## 测试
 ```bash

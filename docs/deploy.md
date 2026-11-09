@@ -16,15 +16,32 @@ api 和 worker 在容器里以普通用户（uid 10001）运行，不是 root。
 
 ## 2. 第一次部署
 
-需要一台装了 Docker（含 compose 插件）的 Linux 服务器，建议 4 核 8 GB 以上。
+需要一台装了 Docker（含 compose 插件）的机器：Linux 服务器，或者装了 Docker Desktop 的 Windows / Mac 电脑都可以。
+试用建议 2 核 4 GB 以上，正式试点建议 4 核 8 GB 以上。
+
+### 2.1 一键部署（先看效果）
 
 ```bash
 git clone <仓库地址> agent_fpga && cd agent_fpga
+deploy/quickstart.sh
+```
+
+脚本会：生成 `.env`（数据库密码、匿名盐随机生成）→ 构建并启动 → 第一次运行时导入演示数据，并打印演示账号和密码。
+结束后打开 `http://localhost:8080`（别的电脑访问时把 localhost 换成这台机器的 IP；云服务器要在安全组里放开 8080 端口）。
+Windows 上在 Git Bash 或 WSL 里运行这个脚本。
+
+想用大模型提示和助教对话：在 `.env` 里填 `DEEPSEEK_API_KEY`，再运行 `docker compose up -d`。不填也能正常做题，提示用规则生成。
+
+部署后自检：`python3 deploy/smoke_test.py http://localhost:8080 <演示密码>`，最后一行显示“冒烟测试通过”即可。
+
+### 2.2 正式部署（不要演示数据）
+
+```bash
 cp .env.example .env
 # 编辑 .env，至少填写：
-#   POSTGRES_PASSWORD   数据库密码（随便一串长随机字符）
+#   POSTGRES_PASSWORD   数据库密码（一串长随机字符）
 #   ANON_SALT           匿名 ID 的盐，例如 `openssl rand -hex 16` 的输出；定了以后不要再改，否则匿名 ID 全部变化
-#   DEEPSEEK_API_KEY    不填也能用，只是提示全部走规则提示、助教对话不可用
+#   DEEPSEEK_API_KEY    可选
 docker compose up -d --build
 docker compose ps                     # 四个容器都是 running / healthy
 curl http://localhost:8080/api/health # {"ok": true, ...}
@@ -39,10 +56,13 @@ docker compose exec api python -m backend.scripts.create_class \
 
 之后教师登录网站，在“班级管理”里粘贴学生名单（学号,姓名[,分组]），系统生成每个学生的初始密码。
 
-说明：
-- 网站默认在 `8080` 端口（`.env` 里的 `WEB_PORT`）。学校要求 HTTPS 时，在前面再放一层学校统一的反向代理或在 nginx 里配证书，配好后把 `COOKIE_SECURE=true`；只用 http 访问时必须保持 `false`，否则登录 Cookie 发不出去。
-- 服务器在国内、访问 Docker Hub / PyPI / npm 慢时，给 Docker 配镜像加速，或在构建前给 pip、npm 配国内源。
+### 2.3 说明
+
+- 网站默认在 `8080` 端口（`.env` 里的 `WEB_PORT`）。要 HTTPS 时，在前面再放一层反向代理或在 nginx 里配证书，配好后把 `COOKIE_SECURE=true`；只用 http 访问时必须保持 `false`，否则登录 Cookie 发不出去。
+- **国内服务器**：Docker Hub 在国内经常连不上，先给 Docker 配镜像加速（云服务器厂商一般提供，如腾讯云、阿里云的文档里搜“Docker 镜像加速”），否则拉不到 ubuntu、node、nginx、postgres 这几个基础镜像。
+  apt / pip / npm 下载慢时，在 `.env` 里填 `APT_MIRROR`、`PIP_INDEX_URL`、`NPM_REGISTRY`（`.env.example` 里有清华源和 npmmirror 的写法）。
 - 更新代码：`git pull && docker compose up -d --build`（迁移在 api 启动时自动执行）。
+- GitHub 上的“部署检查”（`.github/workflows/deploy-check.yml`）会在部署相关文件改动时，在 GitHub 的服务器上完整跑一遍一键部署、冒烟测试和备份恢复。
 
 ## 3. 备份与恢复
 
@@ -103,4 +123,4 @@ version: v1
   恢复后学生照常登录，新提交的编号接着往下排（1202），判题正常。
 - **资源限制**：`$display` 零延迟死循环的代码 0.6 秒被终止并按超时处理（不加限制时要等满 10 秒）。
 - 并发测试按要求不做。
-- **没有验证的**：两个镜像的完整构建（`docker compose build`）。开发云环境里容器访问外网要经过一个需要额外证书的代理，这个证书不允许装进镜像，所以只做了 Dockerfile 静态检查（`docker build --check`，无告警）和 nginx 配置检查（`nginx -t`）。第一次在学校服务器上部署时，请按第 2 节构建并确认 `docker compose ps` 四个容器正常。
+- **镜像构建**：开发云环境里容器访问外网要经过一个需要额外证书的代理，这个证书不允许装进镜像，所以镜像的完整构建放到 GitHub 的“部署检查”里做（见 2.3 节）。
