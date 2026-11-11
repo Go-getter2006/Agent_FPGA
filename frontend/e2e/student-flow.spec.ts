@@ -401,3 +401,38 @@ test('参考答案：提交 3 次没通过并看过代码提示后解锁', async
   await page.screenshot({ path: `${SHOTS}/answer.png` })
   expect(eventTypes('S2026006')).toContain('answer.reveal')
 })
+
+test('误区复盘：写出锁存器后，复习里出现别的题里同样问题的“找 bug”', async ({ page }) => {
+  await login(page, 'S2026005')
+  await page.waitForURL(/student/)
+  if (page.url().includes('consent')) await page.getByTestId('consent-accept').click()
+  await page.goto('/student')
+  // 用接口快速提交一份会生成锁存器的代码
+  await page.evaluate(async ([pid, code]) => {
+    const call = async (m: string, u: string, b?: unknown) => (await fetch(u, { method: m, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })).json()
+    const d = await call('GET', `/api/student/problems/${pid}`)
+    const cells = d.predict_points.flatMap((p: any) => p.steps.map((s: number) => ({ signal: p.signal, step: s, value: '0' })))
+    await call('POST', `/api/student/problems/${pid}/predictions`, { waveform: { cells }, hardware: { ff_count: 2, latch: false, ff_signals: [] }, confidence: 2 })
+    const { attempt_id } = await call('POST', `/api/student/problems/${pid}/attempts`, { code })
+    for (let k = 0; k < 120; k++) {
+      if ((await call('GET', `/api/student/attempts/${attempt_id}`)).status === 'done') break
+      await new Promise((r) => setTimeout(r, 500))
+    }
+  }, [PID, caseCode('c3_latch.v')] as const)
+  // 复习条目第二天到期：测试里直接改成已到期
+  execFileSync('python3', ['-c', `
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+uid = db.execute("select id from users where login_name='S2026005'").fetchone()[0]
+db.execute("update review_items set due_at = datetime('now', '-1 hour') where user_id = ?", (uid,))
+db.commit()
+`, E2E_DB])
+  await page.goto('/student/review')
+  const card = page.locator('[data-testid^="review-item-"]').filter({ has: page.getByTestId('find-bug') }).first()
+  await expect(card).toContainText('这段代码有什么问题')
+  await card.getByTestId('bug-option').filter({ hasText: '锁存器' }).click()
+  await card.getByTestId('bug-submit').click()
+  await expect(card).toContainText('答对了')
+  await page.screenshot({ path: `${SHOTS}/find-bug.png`, fullPage: true })
+})

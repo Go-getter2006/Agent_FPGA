@@ -672,6 +672,7 @@ def review_list(user: User = Depends(student_user), db: DbSession = Depends(get_
 class ReviewAnswerIn(BaseModel):
     waveform: WaveformIn | None = None
     hardware: HardwareIn | None = None
+    choice: str | None = Field(default=None, max_length=32)      # 误区复盘：选出的问题标签
 
 
 @router.post("/review/{item_id}/answer")
@@ -682,8 +683,8 @@ def review_answer(item_id: int, body: ReviewAnswerIn, user: User = Depends(stude
         raise not_found("复习条目")
     if item.status != "active" or item.due_at > utcnow():
         raise ApiError(409, "NOT_DUE", "这一条还没到复习时间")
-    widths = {o["name"]: o["width"] for o in item.question["skeleton"]["outputs"]}
-    answers = {}
+    widths = {o["name"]: o["width"] for o in (item.question.get("skeleton") or {}).get("outputs", [])}
+    answers: dict = {"choice": body.choice}
     if body.waveform is not None:
         answers["waveform"] = {"cells": [
             {"signal": c.signal, "step": c.step, "value": normalize_value(c.value, widths.get(c.signal, 1))}
@@ -694,7 +695,8 @@ def review_answer(item_id: int, body: ReviewAnswerIn, user: User = Depends(stude
     review_scheduler.apply_answer(item, graded["correct"])
     log_event(db, user, "review.answer", problem_id=item.problem_id, payload={
         "item_id": item.id, "correct": graded["correct"], "box": item.box, "status": item.status,
-        "accuracy": graded["evaluation"]["accuracy"]})
+        "accuracy": graded["evaluation"]["accuracy"], "kind": item.question.get("kind"),
+        "choice": body.choice if item.question.get("kind") == "find_bug" else None})
     db.commit()
     return {"correct": graded["correct"], "box": item.box, "status": item.status, "due_at": item.due_at,
             "evaluation": graded["evaluation"]}

@@ -130,6 +130,11 @@ $$\mathrm{Cal}=\frac{1}{|S|}\sum_{i\in S}\big(q(c_i)-A_{\text{pred},i}\big)$$
 - 触发：某次尝试落在 fragile 或 concept_gap，就把该题关联知识点的一道预测题加入复习队列（优先选同知识点的其他题）
 - 间隔：采用 4 个盒子，间隔分别为 1、3、7、14 天。答对进入下一个盒子；答错回到第 1 个盒子；第 4 个盒子答对后移出队列
 - 每天最多推送 5 条，到期越久越优先
+- 同一道题、同一种预测在队列里只留 1 条：一题关联多个知识点时，第二个知识点换一道题
+- **误区复盘（find_bug，2026-11）**：某次提交出现代码层面的问题标签（latch_inferred、blocking_in_seq、multi_driven、width_mismatch、non_synthesizable、compile_error），
+  就从错误样本库（`problems/*/cases/`）里挑一份**别的题**、带同样标签的样本代码（去掉开头的注释，不露答案），出一道“这段代码有什么问题”的四选一；
+  干扰项来自其他问题标签。答案和说明（样本开头的注释）只在提交后返回。同一标签同时只有 1 条，用过的样本优先换一份；和预测类复习共用盒子间隔和每日上限。
+  race_order_sensitive（来自顺序打乱实验）和 nonblocking_in_comb（样本库里暂时没有样本）暂不出题
 
 ## 6. 教师端预警规则（满足任一条即列入“需要关注的学生”）
 1. 有 2 个及以上核心知识点（blocking、sequential、fsm、parallel）的 $F_k\ge 0.5$
@@ -166,7 +171,7 @@ $$\mathrm{Cal}=\frac{1}{|S|}\sum_{i\in S}\big(q(c_i)-A_{\text{pred},i}\big)$$
 | chat.send / chat.reply | session_id、length；reply 时加 llm_call_id |
 | shuffle.run | attempt_id、order_sensitive |
 | tb.submit | score、caught、missed |
-| review.answer | item_id、correct、box |
+| review.answer | item_id、correct、box；kind（waveform / hardware / find_bug），find_bug 时加 choice |
 
 前端产生的界面事件（波形查看、格子点击、入门课）批量上报，每 5 秒或满 20 条发一次；离开页面时用 sendBeacon 把剩下的发出去。
 

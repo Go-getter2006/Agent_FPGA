@@ -130,6 +130,8 @@ def apply_judge(db: DbSession, attempt: Attempt, diagnosis: dict) -> None:
         mastery.recompute(db, user.id, problem.knowledge_points)
         if flags.get("review", True):
             review_scheduler.enqueue_for_attempt(db, attempt, problem, misconceptions)
+    if flags.get("review", True):         # 误区复盘：编译没过也可以出（语法错误也是一类问题）
+        review_scheduler.enqueue_find_bug(db, attempt)
 
 
 def apply_shuffle_run(db: DbSession, run: ShuffleRun, result: dict) -> None:

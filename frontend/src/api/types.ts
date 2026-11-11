@@ -157,8 +157,10 @@ export interface ReportData {
 }
 
 export interface ReviewQuestion {
-  source: string; kind: 'waveform' | 'hardware'; code: string
+  source: string; kind: 'waveform' | 'hardware' | 'find_bug'; code: string
   predict_points: PredictPoint[]; hardware_questions: string[]; skeleton: Skeleton
+  // 误区复盘（find_bug）：看代码选出它的问题
+  tag?: string; task?: string; options?: { code: string; label: string }[]
 }
 
 export interface ReviewData {

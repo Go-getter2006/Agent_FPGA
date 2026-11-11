@@ -5,6 +5,8 @@
 - 4 个盒子，间隔 1、3、7、14 天；答对进入下一个盒子，答错回到第 1 个，第 4 个盒子答对后移出
 - 每天最多推送 5 条，到期越久越优先
 - 题目的标准答案来自裁判对那份代码的仿真与综合结果，只存在服务端
+- 误区复盘（find_bug，2026-11）：某次提交出现代码层面的问题标签（锁存器、阻塞赋值用错、位宽……），
+  就从错误样本库里挑一份“别的题、同样问题”的代码，让学生选出它的问题；每个标签同时最多 1 条
 """
 from __future__ import annotations
 
@@ -15,8 +17,11 @@ from sqlalchemy.orm import Session as DbSession
 
 from ..config import get_settings
 from ..db import utcnow
+from judge.problem import list_problem_ids, load_problem, read_expected_tags
+
 from ..models import Attempt, Event, Problem, ReviewItem
-from .learner_model import evaluate_prediction, prediction_ok
+from .fallback_hints import TAG_CONCEPTS
+from .learner_model import TAG_LABELS, evaluate_prediction, prediction_ok
 
 INTERVAL_DAYS = {1: 1, 2: 3, 3: 7, 4: 14}
 TRIGGER_QUADRANTS = ("fragile", "concept_gap")
@@ -40,10 +45,12 @@ def _answer_from_judge(judge: dict) -> dict:
     return {"sim": {"trace": judge["sim"]["trace"]}, "hardware": judge.get("hardware")}
 
 
-def choose_review(db: DbSession, attempt: Attempt, kp: str, kind: str) -> tuple[Problem, dict] | None:
+def choose_review(db: DbSession, attempt: Attempt, kp: str, kind: str,
+                  exclude: set[str] | frozenset[str] = frozenset()) -> tuple[Problem, dict] | None:
+    """exclude：已经在复习队列里的题，换一道（一题关联多个知识点时避免重复）。"""
     candidates = db.scalars(select(Problem).order_by(Problem.id)).all()
     others = [p for p in candidates if kp in p.knowledge_points and p.id != attempt.problem_id
-              and p.meta.get("starter") and p.meta.get("starter_eval")]
+              and p.id not in exclude and p.meta.get("starter") and p.meta.get("starter_eval")]
     if others:
         p = others[0]
         return p, _question_from(p, p.meta["starter"], "starter", p.meta["starter_eval"], kind)
@@ -60,22 +67,100 @@ def enqueue_for_attempt(db: DbSession, attempt: Attempt, problem: Problem, misco
     now = now or utcnow()
     kind = "hardware" if {"pred_ff_confusion", "pred_latch_blind"} & set(misconceptions) else "waveform"
     added = []
+    active = db.scalars(select(ReviewItem).where(ReviewItem.user_id == attempt.user_id,
+                                                 ReviewItem.status == "active")).all()
     for kp in problem.knowledge_points:
-        exists = db.scalar(select(ReviewItem.id).where(
-            ReviewItem.user_id == attempt.user_id, ReviewItem.knowledge_point == kp,
-            ReviewItem.status == "active"))
-        if exists:
+        # 同一知识点只留 1 条预测类复习；“找 bug”复习单独计（按问题标签）
+        if any(i.knowledge_point == kp and i.question.get("kind") != "find_bug" for i in active):
             continue
-        chosen = choose_review(db, attempt, kp, kind)
+        queued = {i.problem_id for i in [*active, *added] if i.question.get("kind") != "find_bug"}
+        chosen = choose_review(db, attempt, kp, kind, exclude=queued)
         if chosen is None:
             continue
         p, question = chosen
+        # 同一道题、同一种预测只留 1 条（一题关联多个知识点时，不同知识点可能选中同一道复习题）
+        if any(i.problem_id == p.id and i.question.get("kind") == question["kind"]
+               and i.question.get("source") == question["source"] for i in [*active, *added]):
+            continue
         item = ReviewItem(user_id=attempt.user_id, knowledge_point=kp, problem_id=p.id, box=1,
                           due_at=now + timedelta(days=INTERVAL_DAYS[1]), status="active",
                           source_attempt_id=attempt.id, question=question)
         db.add(item)
         added.append(item)
     return added
+
+
+# ---------------------------------------------------------------- 误区复盘：看代码，选出它的问题
+
+# 能出“找 bug”题的标签（代码层面、裁判能直接判出、样本库里有样本）；按优先级排列。
+# 不在其中的：race_order_sensitive 来自顺序打乱实验，不是普通判题的标签；nonblocking_in_comb 目前样本库里没有样本
+# （加样本会改变该题 testbench 打分用的错误电路集合，需要先确认）
+BUG_TAGS = ("latch_inferred", "blocking_in_seq", "multi_driven", "width_mismatch", "non_synthesizable", "compile_error")
+BUG_LABELS = {**TAG_LABELS, "compile_error": "语法错误，编译不通过"}
+_case_cache: dict[str, list[dict]] = {}
+
+
+def bug_cases(problems_dir=None) -> list[dict]:
+    """错误样本库：每份样本的代码（去掉开头的注释）、预期标签和说明。"""
+    key = str(problems_dir or "")
+    if key not in _case_cache:
+        out = []
+        for pid in list_problem_ids(problems_dir):
+            prob = load_problem(pid, problems_dir)
+            for path in prob.case_paths():
+                lines = path.read_text(encoding="utf-8").splitlines()
+                head = 0
+                while head < len(lines) and lines[head].lstrip().startswith("//"):
+                    head += 1
+                explain = [ln.lstrip("/ ").strip() for ln in lines[:head] if not ln.lstrip("/ ").startswith("expect")]
+                out.append({"id": f"{pid}/{path.name}", "problem_id": pid, "tags": read_expected_tags(path),
+                            "code": "\n".join(lines[head:]).strip() + "\n", "explain": "".join(explain)})
+        _case_cache[key] = out
+    return _case_cache[key]
+
+
+def _options(case: dict, tag: str, seed: str) -> list[dict]:
+    """正确选项 + 3 个干扰项（不含这份样本的其他预期标签），顺序由 seed 决定（确定性）。"""
+    import random
+    distract = [t for t in BUG_TAGS if t not in case["tags"]]
+    rng = random.Random(seed)
+    picks = rng.sample(distract, 3) + [tag]
+    rng.shuffle(picks)
+    return [{"code": t, "label": BUG_LABELS[t]} for t in picks]
+
+
+def enqueue_find_bug(db: DbSession, attempt: Attempt, now: datetime | None = None) -> ReviewItem | None:
+    """这次提交出现了代码层面的问题标签：加一条“找 bug”复习（同一标签同时只有 1 条）。"""
+    tags = [t for t in BUG_TAGS if t in ((attempt.judge or {}).get("tags") or [])]
+    if not tags:
+        return None
+    active = db.scalars(select(ReviewItem).where(ReviewItem.user_id == attempt.user_id)).all()
+    open_tags = {i.question.get("tag") for i in active if i.status == "active" and i.question.get("kind") == "find_bug"}
+    used = {i.question.get("case") for i in active if i.question.get("kind") == "find_bug"}
+    for tag in tags:
+        if tag in open_tags:
+            continue
+        cands = [c for c in bug_cases() if tag in c["tags"] and c["problem_id"] != attempt.problem_id]
+        cands = [c for c in cands if c["id"] not in used] or cands
+        if not cands:
+            continue
+        case = cands[0]
+        problem = db.get(Problem, case["problem_id"])
+        if problem is None:
+            continue
+        now = now or utcnow()
+        kp = (TAG_CONCEPTS.get(tag) or problem.knowledge_points)[0]   # 记在这类问题对应的知识点上
+        spec = (problem.meta.get("spec") or "").split("\n\n")
+        task = next((para for para in spec if para.strip() and not para.startswith("#")), "")
+        item = ReviewItem(user_id=attempt.user_id, knowledge_point=kp, problem_id=problem.id, box=1,
+                          due_at=now + timedelta(days=INTERVAL_DAYS[1]), status="active", source_attempt_id=attempt.id,
+                          question={"kind": "find_bug", "source": "case", "tag": tag, "case": case["id"],
+                                    "code": case["code"], "task": task.strip(),
+                                    "options": _options(case, tag, f"{attempt.user_id}:{case['id']}"),
+                                    "answer": {"tags": case["tags"], "explain": case["explain"]}})
+        db.add(item)
+        return item
+    return None
 
 
 def start_of_beijing_day(now: datetime) -> datetime:
@@ -107,6 +192,12 @@ def public_question(item: ReviewItem) -> dict:
 
 def grade(item: ReviewItem, answers: dict) -> dict:
     q = item.question
+    if q.get("kind") == "find_bug":
+        choice = answers.get("choice")
+        correct = choice in q["answer"]["tags"]
+        right = [o for o in q["options"] if o["code"] in q["answer"]["tags"]]
+        return {"correct": correct, "evaluation": {"accuracy": 1.0 if correct else 0.0, "choice": choice,
+                                                   "answer": right, "explain": q["answer"]["explain"]}}
     evaluation = evaluate_prediction(
         predict_points=q["predict_points"] if q["kind"] == "waveform" else [],
         hardware_questions=q.get("hardware_questions", []),
