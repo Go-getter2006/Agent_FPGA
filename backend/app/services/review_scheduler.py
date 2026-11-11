@@ -45,10 +45,12 @@ def _answer_from_judge(judge: dict) -> dict:
     return {"sim": {"trace": judge["sim"]["trace"]}, "hardware": judge.get("hardware")}
 
 
-def choose_review(db: DbSession, attempt: Attempt, kp: str, kind: str) -> tuple[Problem, dict] | None:
+def choose_review(db: DbSession, attempt: Attempt, kp: str, kind: str,
+                  exclude: set[str] | frozenset[str] = frozenset()) -> tuple[Problem, dict] | None:
+    """exclude：已经在复习队列里的题，换一道（一题关联多个知识点时避免重复）。"""
     candidates = db.scalars(select(Problem).order_by(Problem.id)).all()
     others = [p for p in candidates if kp in p.knowledge_points and p.id != attempt.problem_id
-              and p.meta.get("starter") and p.meta.get("starter_eval")]
+              and p.id not in exclude and p.meta.get("starter") and p.meta.get("starter_eval")]
     if others:
         p = others[0]
         return p, _question_from(p, p.meta["starter"], "starter", p.meta["starter_eval"], kind)
@@ -71,10 +73,15 @@ def enqueue_for_attempt(db: DbSession, attempt: Attempt, problem: Problem, misco
         # 同一知识点只留 1 条预测类复习；“找 bug”复习单独计（按问题标签）
         if any(i.knowledge_point == kp and i.question.get("kind") != "find_bug" for i in active):
             continue
-        chosen = choose_review(db, attempt, kp, kind)
+        queued = {i.problem_id for i in [*active, *added] if i.question.get("kind") != "find_bug"}
+        chosen = choose_review(db, attempt, kp, kind, exclude=queued)
         if chosen is None:
             continue
         p, question = chosen
+        # 同一道题、同一种预测只留 1 条（一题关联多个知识点时，不同知识点可能选中同一道复习题）
+        if any(i.problem_id == p.id and i.question.get("kind") == question["kind"]
+               and i.question.get("source") == question["source"] for i in [*active, *added]):
+            continue
         item = ReviewItem(user_id=attempt.user_id, knowledge_point=kp, problem_id=p.id, box=1,
                           due_at=now + timedelta(days=INTERVAL_DAYS[1]), status="active",
                           source_attempt_id=attempt.id, question=question)

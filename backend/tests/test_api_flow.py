@@ -477,3 +477,17 @@ def test_find_bug_review_from_case_library(student):
     # 样本库：每类问题都有样本可选
     covered = {t for c in bug_cases() for t in c["tags"]}
     assert set(BUG_TAGS) <= covered
+
+
+def test_review_not_duplicated_across_knowledge_points(student):
+    """一题关联多个知识点时，复习队列里不会出现两条同一道题的同类复习。"""
+    user, client = student
+    pid = "counter_mod10"                      # 知识点：counter、sequential、reset
+    lock(client, pid, value="0xF")             # 预测全错 → fragile
+    attempt = submit(client, pid, ref_code(pid))
+    assert attempt["quadrant"] == "fragile"
+    with SessionLocal() as db:
+        items = [i for i in db.scalars(select(ReviewItem).where(ReviewItem.user_id == user.id)).all()
+                 if i.question["kind"] != "find_bug"]
+        keys = [(i.problem_id, i.question["kind"], i.question["source"]) for i in items]
+        assert items and len(keys) == len(set(keys))

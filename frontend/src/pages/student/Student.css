@@ -24,7 +24,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .g-7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
 .g-5-4-4 { grid-template-columns: 5fr 4fr 4fr; }
 .review-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; }
-.review-code { margin: 0; font: 12px/18px var(--mono); background: #FCFCFD; border: 1px solid var(--c-border); border-radius: 6px; padding: 8px 0; overflow: auto; max-height: 420px; }
+.review-code { margin: 0; font: 12px/18px var(--mono); font-variant-ligatures: none; background: #FCFCFD; border: 1px solid var(--c-border); border-radius: 6px; padding: 8px 0; overflow: auto; max-height: 420px; }
 .review-code .no { display: inline-block; width: 36px; text-align: right; padding-right: 10px; color: #9CA3AF; user-select: none; }
 .review-cells { display: flex; flex-direction: column; gap: 2px; font-size: 13px; margin-top: 8px; }
 @media (max-width: 768px) {
