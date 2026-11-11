@@ -14,6 +14,8 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..models import (Assignment, Attempt, ChatMessage, Event, Explanation, Hint, Investigation, KnowledgePoint,
                       Prediction, Problem, Progress, ReviewItem, ShuffleRun, TbSubmission, User)
+from judge import schematic as judge_schematic
+
 from ..services import answer, chat, jobs, llm_hints, review_scheduler, workflow
 from ..services.llm import get_llm
 from ..services.events import CLIENT_EVENT_TYPES, log_event, primary_enrollment
@@ -483,6 +485,26 @@ def request_hint(aid: int, user: User = Depends(student_user), db: DbSession = D
                        "fallback_reason": out["fallback_reason"]})
     db.commit()
     return _hint_payload(hint)
+
+
+# ---------------------------------------------------------------- 电路图（代码 ↔ 综合出的电路联动）
+
+@router.get("/attempts/{aid}/schematic")
+def attempt_schematic(aid: int, user: User = Depends(student_user), db: DbSession = Depends(get_db)):
+    """这次提交综合出的 RTL 级电路（yosys prep 网表），前端画成电路图；第一次生成后存在 attempt.analysis 里。"""
+    a = _attempt(db, user, aid)
+    if a.status != "done":
+        raise ApiError(409, "NOT_READY", "等仿真结果出来再看电路图")
+    if not (a.judge or {}).get("compile", {}).get("ok"):
+        raise ApiError(409, "COMPILE_FAILED", "代码没有通过编译，先改好再看电路图")
+    cached = (a.analysis or {}).get("schematic")
+    if cached is None:
+        cached = judge_schematic(a.code, timeout=get_settings().judge_timeout)
+        a.analysis = {**(a.analysis or {}), "schematic": cached}
+        db.commit()
+    if not cached["ok"]:
+        raise ApiError(409, "SCHEMATIC_FAILED", cached["error"] or "这段代码画不出电路图")
+    return {"netlist": cached["netlist"], "cells": cached["cells"], "drivers": (a.judge or {}).get("drivers") or {}}
 
 
 # ---------------------------------------------------------------- 第 4 级：参考答案

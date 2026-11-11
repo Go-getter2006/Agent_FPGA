@@ -491,3 +491,28 @@ def test_review_not_duplicated_across_knowledge_points(student):
                  if i.question["kind"] != "find_bug"]
         keys = [(i.problem_id, i.question["kind"], i.question["source"]) for i in items]
         assert items and len(keys) == len(set(keys))
+
+
+# ---------------------------------------------------------------- 电路图（2026-11）
+
+def test_schematic_netlist_and_cache(student):
+    user, client = student
+    pid = "counter_mod10"
+    lock(client, pid)
+    attempt = submit(client, pid, ref_code(pid))
+    r = client.get(f"/api/student/attempts/{attempt['id']}/schematic")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    top = body["netlist"]["modules"]["top_module"]
+    assert top["cells"] and set(top["ports"]) >= {"clk", "rst", "en", "q"}
+    dffs = [c for c in body["cells"].values() if c["type"] == "$dff"]
+    assert dffs and dffs[0]["outputs"] == ["q"]                     # 触发器知道自己驱动的是 q
+    assert all(c["lines"] for c in body["cells"].values())          # 每个元件都能对回代码行
+    assert body["drivers"]["q"]
+    with SessionLocal() as db:
+        assert db.get(Attempt, attempt["id"]).analysis["schematic"]["ok"] is True     # 第一次生成后缓存
+    # 编译不过：不给电路图
+    lock(client, pid)
+    bad = submit(client, pid, "module top_module(input clk, output q); assign q = ; endmodule\n")
+    r = client.get(f"/api/student/attempts/{bad['id']}/schematic")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "COMPILE_FAILED"

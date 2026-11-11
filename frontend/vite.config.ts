@@ -5,6 +5,8 @@ const backend = process.env.BACKEND_URL ?? 'http://127.0.0.1:8000'
 
 export default defineConfig({
   plugins: [react()],
+  // 电路图：netlistsvg 依赖的 elkjs 默认入口会去找 Node 专用的 webworker-threads，浏览器里改用它自带的浏览器版
+  resolve: { alias: { elkjs: 'elkjs/lib/elk.bundled.js' } },
   server: {
     port: Number(process.env.FRONTEND_PORT ?? 5173),
     strictPort: true,

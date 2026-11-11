@@ -179,3 +179,6 @@ $$S_{\text{tb}}=\frac{|\mathcal{C}|}{|\mathcal{M}|-|\mathcal{E}|}$$
     - 原代码编译失败或仿真超时时 `ok` 为 false、`order_sensitive` 为 null
 14. **资源限制（阶段 6）**：Linux 上每个外部命令经 `prlimit` 限制 CPU 时间（超时秒数 + 5）、内存（`JUDGE_MEMORY_MB`，默认 2048）、写文件大小（`JUDGE_OUTPUT_MB`，默认 32）；工具输出先写临时文件，所以输出量也受这个上限约束。超出 CPU 或输出上限按超时处理（`sim.timeout` 为 true，与第 3 条一致），输出 JSON 字段不变。`JUDGE_RLIMITS=0` 关闭；没有 prlimit 的系统自动不加限制。详见 docs/deploy.md 第 5 节
 15. **题目目录的可选内容（2026-11）**：`skeleton.v` 是给学生看的代码框架（`____` 处留空），第 3 级规则提示会用到；`problem.yaml` 可加 `order`（题目列表里的顺序，默认 100，入门题是 1–4）和 `stage: beginner`（入门题）。这三项都不影响裁判输出。入门题 4 道：`b1_and_gate`、`b2_mux2`、`b3_dff_en`、`b4_led_blink`，样本要求与其他题相同
+16. **电路图网表（2026-11）**：`judge.schematic(code)` 用 yosys `read_verilog; prep -top top_module; opt_clean -purge; write_json` 生成 RTL 级网表（加法器、比较器、选择器、触发器这一级），给前端用 netlistsvg 画电路图。
+    每个单元带 src 行号（`src_lines` 解析 `student.v:16.13-16.26|…`）和它驱动的有名字的信号（`outputs`；触发器的 src 覆盖整个 always 块，前端按输出信号对应到赋值行）。
+    只用于展示，不参与判对错，也不改 `diagnose` 的输出。后端接口 `GET /api/student/attempts/{aid}/schematic`，第一次生成后缓存在 `attempts.analysis.schematic`
