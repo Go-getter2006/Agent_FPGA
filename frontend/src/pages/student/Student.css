@@ -24,8 +24,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .g-7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
 .g-5-4-4 { grid-template-columns: 5fr 4fr 4fr; }
 .review-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; }
-.code-block { margin: 0; font: 12px/18px var(--mono); background: #FCFCFD; border: 1px solid var(--c-border); border-radius: 6px; padding: 8px 0; overflow: auto; max-height: 420px; }
-.code-block .no { display: inline-block; width: 36px; text-align: right; padding-right: 10px; color: #9CA3AF; user-select: none; }
+.review-code { margin: 0; font: 12px/18px var(--mono); background: #FCFCFD; border: 1px solid var(--c-border); border-radius: 6px; padding: 8px 0; overflow: auto; max-height: 420px; }
+.review-code .no { display: inline-block; width: 36px; text-align: right; padding-right: 10px; color: #9CA3AF; user-select: none; }
 .review-cells { display: flex; flex-direction: column; gap: 2px; font-size: 13px; margin-top: 8px; }
 @media (max-width: 768px) {
   .problems-grid, .review-body, .home-grid { grid-template-columns: 1fr; }
@@ -41,3 +41,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .calib-nums .big { font-size: 26px; font-weight: 600; }
 .calib-verdict { margin-top: 10px; font-size: 14px; }
 .calib-list { margin-top: 6px; font-size: 13px; }
+
+.find-bug .opts-v { display: flex; flex-direction: column; gap: 8px; }
+.find-bug .opt { border: 1px solid var(--c-border); background: #fff; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 13px; text-align: left; }
+.find-bug .opt:hover:not(:disabled) { border-color: var(--c-primary); }
+.find-bug .opt.on { border-color: var(--c-primary); background: var(--c-primary-bg); }
+.find-bug .opt.right { border-color: var(--c-success); background: #F0FDF4; }
+.find-bug .opt.wrong { border-color: var(--c-error); background: #FEF2F2; }
+.find-bug .opt:disabled { cursor: default; }

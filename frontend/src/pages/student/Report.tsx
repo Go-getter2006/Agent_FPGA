@@ -58,7 +58,7 @@ export default function Report() {
             {d.review_upcoming.length === 0 && <Empty title="复习队列是空的">落在“会写但没把握”或“概念未通”的题会自动加进来</Empty>}
             {d.review_upcoming.map((r) => (
               <div className="row" key={r.id}><span className="dot" style={{ background: 'var(--c-primary)' }} />
-                <div className="main"><b>预测：{r.title}{r.kind === 'hardware' ? '（硬件）' : '（波形）'}</b>
+                <div className="main"><b>{r.kind === 'find_bug' ? `找 bug：来自${r.title}` : `预测：${r.title}${r.kind === 'hardware' ? '（硬件）' : '（波形）'}`}</b>
                   <span>{beijingTime(r.due_at)} 到期 · 第 {r.box} 轮</span></div></div>
             ))}
           </div>

@@ -436,3 +436,44 @@ def test_confidence_recorded_and_flagged(student):
     # 把握程度只能是 1–3
     r = client.post(f"/api/student/problems/{pid}/predictions", json={"waveform": {"cells": cells}, "confidence": 5})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------- 误区复盘：找 bug（2026-11）
+
+def test_find_bug_review_from_case_library(student):
+    from backend.app.services.review_scheduler import BUG_TAGS, bug_cases
+    user, client = student
+    pid = "seq_detector_101"
+    lock(client, pid)
+    attempt = submit(client, pid, case_code(pid, "c3_latch.v"))
+    assert "latch_inferred" in attempt["tags"]
+    with SessionLocal() as db:
+        items = db.scalars(select(ReviewItem).where(ReviewItem.user_id == user.id)).all()
+        bug = [i for i in items if i.question["kind"] == "find_bug"]
+        assert len(bug) == 1 and bug[0].question["tag"] == "latch_inferred"
+        assert bug[0].problem_id != pid                       # 换一道题的样本
+        assert "expect" not in bug[0].question["code"] and "错误" not in bug[0].question["code"]   # 不露答案
+        assert sum(o["code"] == "latch_inferred" for o in bug[0].question["options"]) == 1
+        assert len(bug[0].question["options"]) == 4
+        bug[0].due_at = utcnow() - timedelta(minutes=1)
+        db.commit()
+        item_id = bug[0].id
+    # 同一个问题再犯一次：不重复加
+    lock(client, pid)
+    submit(client, pid, case_code(pid, "c3_latch.v"))
+    with SessionLocal() as db:
+        assert len([i for i in db.scalars(select(ReviewItem).where(ReviewItem.user_id == user.id)).all()
+                    if i.question["kind"] == "find_bug"]) == 1
+    # 复习列表里不带答案；选错 → 回到第 1 轮，并给出正确答案和说明
+    listed = next(i for i in client.get("/api/student/review").json()["items"] if i["id"] == item_id)
+    assert "answer" not in listed["question"]
+    wrong = next(o["code"] for o in listed["question"]["options"] if o["code"] != "latch_inferred")
+    r = client.post(f"/api/student/review/{item_id}/answer", json={"choice": wrong}).json()
+    assert r["correct"] is False and r["box"] == 1
+    assert r["evaluation"]["answer"][0]["code"] == "latch_inferred" and r["evaluation"]["explain"]
+    with SessionLocal() as db:
+        ev = db.scalar(select(Event).where(Event.user_id == user.id, Event.type == "review.answer").order_by(Event.id.desc()))
+        assert ev.payload["kind"] == "find_bug" and ev.payload["choice"] == wrong
+    # 样本库：每类问题都有样本可选
+    covered = {t for c in bug_cases() for t in c["tags"]}
+    assert set(BUG_TAGS) <= covered
