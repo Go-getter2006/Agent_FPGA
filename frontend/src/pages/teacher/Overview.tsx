@@ -59,7 +59,7 @@ export default function Overview() {
   const k = d.kpis
   const maxMis = Math.max(1, ...d.misconceptions.map((m) => m.students))
   return (
-    <div data-testid="t-overview">
+    <div data-testid="t-overview" className={q.isPlaceholderData || heat.isPlaceholderData ? 'stale on' : 'stale'}>
       <div className="page-h"><h1>班级概览</h1>
         <Segmented value={group} onChange={(v) => setGroup(String(v))} options={GROUP_OPTIONS} data-testid="group-filter" /></div>
       <div className="grid g5">

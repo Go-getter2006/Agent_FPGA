@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { get, post } from './client'
 import type { AttemptDetail, HomeData, Me, ProblemDetail, ProblemListItem, KP, ReportData, ReviewData,
   TbSubmission } from './types'
@@ -13,6 +13,7 @@ export const useReview = () => useQuery({ queryKey: ['review'], queryFn: () => g
 export const useProblems = (params: Record<string, string | undefined>) => {
   const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString()
   return useQuery({
+    placeholderData: keepPreviousData,          // 切换筛选时先保留上一次的列表，新结果到了再替换（不闪）
     queryKey: ['problems', qs],
     queryFn: () => get<{ items: ProblemListItem[]; assignments: { id: number; title: string; due_at: string }[];
       knowledge_points: KP[] }>(`/api/student/problems${qs ? `?${qs}` : ''}`),

@@ -321,10 +321,20 @@ test('新手入门：入门课、小测、分步引导、下一步高亮、术�
   const before = await demo.locator('svg').innerHTML()
   await demo.getByTestId('demo-cell').first().click()
   expect(await demo.locator('svg').innerHTML()).not.toBe(before)
-  // 入门题排在题目列表最前面，带“入门”标记
+  // 首页没有布置作业时显示“接下来做”，入门题在前
+  await page.goto('/student')
+  await expect(page.getByTestId('next-problems')).toContainText('与门')
+  // 入门题排在题目列表最前面，带“入门”标记；左侧没有“作业”筛选
   await page.goto('/student/problems')
   await expect(page.locator('tbody tr').first()).toContainText('入门')
   await expect(page.locator('tbody tr').first()).toContainText('与门')
+  await expect(page.locator('.filters')).not.toContainText('作业')
+  // 切换筛选：列表不闪成骨架屏（先保留旧列表，新结果到了再替换）
+  for (const name of ['组合逻辑与 assign', '时序逻辑与触发器（时钟沿）', '全部']) {
+    await page.locator('.filters').getByText(name, { exact: true }).first().click()
+    await expect(page.locator('.problems .ant-skeleton')).toHaveCount(0)
+    await expect(page.locator('.problems tbody tr').first()).toBeVisible()
+  }
 
   // 第一次进入做题页：自动弹出分步引导，走完 8 步
   await page.goto('/student/problems/b1_and_gate')

@@ -51,3 +51,8 @@
 code, pre, .md-code, .code-block pre, .monaco-editor { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 /* 弹窗里的长代码（参考答案）在框内滚动 */
 .ant-modal .code-block pre { max-height: 62vh; overflow: auto; }
+
+/* 切换筛选、分组、学生、题目时：先保留上一次的内容并变淡，新数据到了再替换（不闪成骨架屏）。
+   延迟 150ms 才变淡：数据很快回来时完全看不出变化 */
+.stale { transition: opacity .2s ease; }
+.stale.on { opacity: .55; transition-delay: .15s; }

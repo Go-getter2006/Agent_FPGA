@@ -29,7 +29,7 @@ export default function Misconceptions() {
   const items = list.data.items
   const max = Math.max(1, ...items.map((m) => m.students))
   return (
-    <div data-testid="t-misconceptions">
+    <div data-testid="t-misconceptions" className={list.isPlaceholderData ? 'stale on' : 'stale'}>
       <div className="page-h"><h1>误区分析</h1><Segmented value={group} onChange={(v) => setGroup(String(v))} options={GROUP_OPTIONS} /></div>
       <div className="grid g-5-7">
         <div className="card"><div className="card-h">标签分布 <small><span className="src j">裁判标签</span>代码层面 <span className="src p">预测误区</span>理解层面</small></div>
@@ -46,7 +46,7 @@ export default function Misconceptions() {
           </div></div>
         <div className="card"><div className="card-h">{detail.data ? detail.data.label : '点左边的标签查看详情'}
           {detail.data && <small>{detail.data.students.length} 名学生 · 出现 {detail.data.occurrences} 次</small>}</div>
-          <div className="card-b" data-testid="mis-detail">
+          <div className={detail.isPlaceholderData ? 'card-b stale on' : 'card-b stale'} data-testid="mis-detail">
             {!code && <Empty title="还没选标签" />}
             {detail.isLoading && code && <Loading rows={4} />}
             {detail.data && (
