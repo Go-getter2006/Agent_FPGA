@@ -111,6 +111,21 @@ $$H=\frac{1}{|P|}\sum_{j\in P}h_j$$
 | race_order_sensitive | 结果依赖 always 块的先后顺序 |
 | fragile_pass | 仿真对了，但电路描述有隐患 |
 
+### 4.7 预测把握程度与校准（2026-11 加入）
+锁定预测时，学生选一次把握程度 $c\in\{1,2,3\}$（没把握 / 有点把握 / 很有把握），对应主观概率 $q(1)=\tfrac13,\ q(2)=\tfrac23,\ q(3)=1$。
+范围：该学生最近 $n=10$ 次带把握程度、编译通过、预测能判定的尝试（与 4.3 节的尝试集合相同，按时间取最后 10 次；看过参考答案之后的尝试同样不计入）。
+
+**过度自信率**
+$$O=\frac{N(c=3,\ p=0)}{N(c=3)}$$
+分母为 0 时为空。$O$ 高说明学生常常“很有把握却猜错”——这是自己没意识到的误区，比“没把握也猜错”更需要干预。
+
+**校准偏差**
+$$\mathrm{Cal}=\frac{1}{|S|}\sum_{i\in S}\big(q(c_i)-A_{\text{pred},i}\big)$$
+大于 0 表示高估自己，小于 0 表示低估自己，接近 0 表示对自己的估计准确。
+
+每次尝试另记两个标记（`attempts.analysis`）：`confident_miss` = $c=3$ 且 $p=0$；`under_confident` = $c=1$ 且 $p=1$。学生端判完后据此给出不同的反馈；
+把握程度只由学生自己选，不参与象限和掌握等级的计算，只用于校准指标（满足全局规则 1：没有大模型参与）。
+
 ## 5. 提取练习（复习）调度
 - 触发：某次尝试落在 fragile 或 concept_gap，就把该题关联知识点的一道预测题加入复习队列（优先选同知识点的其他题）
 - 间隔：采用 4 个盒子，间隔分别为 1、3、7、14 天。答对进入下一个盒子；答错回到第 1 个盒子；第 4 个盒子答对后移出队列
@@ -121,6 +136,7 @@ $$H=\frac{1}{|P|}\sum_{j\in P}h_j$$
 2. 同一知识点连续 3 次尝试落在 concept_gap
 3. 近 7 天没有任何事件
 4. 近 10 次重复提交的盲改率 $B\ge 0.7$
+5. 过度自信：最近 10 次带把握程度的尝试里至少 3 次选了“很有把握”，且 $O\ge 0.5$（4.7 节）
 
 ## 7. 事件日志
 每条事件一行，只追加不修改：
@@ -137,7 +153,7 @@ $$H=\frac{1}{|P|}\sum_{j\in P}h_j$$
 | page.view | route |
 | problem.open | problem_id |
 | step.enter | step（predict / run / investigate / modify / make） |
-| predict.submit | kind（waveform / hardware）、cells、answers |
+| predict.submit | kind（waveform / hardware）、cells、answers、confidence（1–3，没选为空） |
 | code.submit | attempt_id、code_hash、lines |
 | judge.done | attempt_id、sim_ok、tags、quadrant、pred_accuracy |
 | waveform.view / waveform.cell_click | attempt_id；点击时加 step、signal、is_mismatch |

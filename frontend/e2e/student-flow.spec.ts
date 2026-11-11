@@ -45,7 +45,8 @@ async function setEditor(page: Page, code: string) {
   await expect(editor.locator('.view-lines')).toContainText('endmodule')
 }
 
-async function predict(page: Page, values: Record<number, '0' | '1'>, hw: { ff: number; ffSignals: string[] }) {
+async function predict(page: Page, values: Record<number, '0' | '1'>, hw: { ff: number; ffSignals: string[] },
+  confidence: '没把握' | '有点把握' | '很有把握' = '有点把握') {
   await page.getByTestId('dock-wave').click()
   for (const [step, v] of Object.entries(values)) {
     const cell = page.getByTestId(`predict-out-${step}`)
@@ -63,6 +64,9 @@ async function predict(page: Page, values: Record<number, '0' | '1'>, hw: { ff: 
     await page.keyboard.press('Enter')
   }
   await page.keyboard.press('Escape')
+  // 把握程度：选好之后“锁定我的预测”才能点
+  await expect(page.getByTestId('btn-lock')).toBeDisabled()
+  await page.getByTestId('confidence').getByText(confidence, { exact: true }).click()
 }
 
 function eventTypes(login: string): string[] {
@@ -256,9 +260,13 @@ test('修改题：顺序打乱实验揭示竞争，再进入修改步骤', async
   await page.getByTestId('dock-hw').click()
   await page.getByLabel('会综合出几个触发器').fill('8')
   await page.getByTestId('hardware-predict').getByText('无', { exact: true }).click()
+  // 下一步提示：先选把握程度；选“很有把握”，结果预测没对上 → 提示“很有把握却没对上”
+  await expect(page.getByTestId('next-step')).toContainText('有多大把握')
+  await page.getByTestId('confidence').getByText('很有把握', { exact: true }).click()
   await page.getByTestId('btn-lock').click()
   await page.getByTestId('btn-run').click()
   await expect(page.locator('.steps li.cur')).toContainText('探究', { timeout: 60_000 })
+  await expect(page.getByTestId('confident-miss')).toBeVisible()
 
   // 顺序打乱实验：预测“不会变”，结果却变了
   await page.getByTestId('dock-shuffle').click()

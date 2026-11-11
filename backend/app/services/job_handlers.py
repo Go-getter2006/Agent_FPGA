@@ -17,7 +17,7 @@ from . import mastery, review_scheduler, workflow
 from .events import log_event
 from .flags import flags_for_user
 from .jobs import finish
-from .learner_model import (QUADRANTS, evaluate_prediction, order_belief_misconception,
+from .learner_model import (QUADRANTS, confidence_flags, evaluate_prediction, order_belief_misconception,
                             prediction_misconceptions, prediction_ok, quadrant)
 
 
@@ -109,14 +109,16 @@ def apply_judge(db: DbSession, attempt: Attempt, diagnosis: dict) -> None:
     attempt.judge = diagnosis
     attempt.sim_ok = sim_ok
     attempt.pred_accuracy = acc
-    attempt.quadrant = quadrant(sim_ok, prediction_ok(acc, get_settings().pred_threshold), compiled)
-    attempt.analysis = {"evaluation": evaluation, "misconceptions": misconceptions}
+    pred_ok = prediction_ok(acc, get_settings().pred_threshold)
+    attempt.quadrant = quadrant(sim_ok, pred_ok, compiled)
+    attempt.analysis = {"evaluation": evaluation, "misconceptions": misconceptions,
+                        **confidence_flags(attempt.confidence, pred_ok if compiled else None)}
     attempt.status = "done"
     attempt.finished_at = utcnow()
 
     log_event(db, user, "judge.done", problem_id=problem.id, attempt_id=attempt.id, payload={
         "attempt_id": attempt.id, "sim_ok": sim_ok, "tags": diagnosis["tags"],
-        "quadrant": attempt.quadrant, "pred_accuracy": acc,
+        "quadrant": attempt.quadrant, "pred_accuracy": acc, "confidence": attempt.confidence,
     })
 
     flags = flags_for_user(db, user)

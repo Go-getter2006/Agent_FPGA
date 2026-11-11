@@ -204,8 +204,8 @@ def problem_detail(pid: str, user: User = Depends(student_user), db: DbSession =
         "code": code,
         "attempts": [_attempt_summary(a) for a in attempts],
         "latest_attempt_id": last.id if last is not None else None,
-        "pending_prediction": [{"id": x.id, "kind": x.kind, "answers": x.answers, "locked_at": x.locked_at}
-                               for x in pending],
+        "pending_prediction": [{"id": x.id, "kind": x.kind, "answers": x.answers, "locked_at": x.locked_at,
+                                "confidence": x.confidence} for x in pending],
         "latest_tb": _tb_payload(latest_tb) if latest_tb else None,
         "flags": flags,
         "stage": meta.get("stage") or "",
@@ -234,6 +234,7 @@ class HardwareIn(BaseModel):
 class PredictionIn(BaseModel):
     waveform: WaveformIn | None = None
     hardware: HardwareIn | None = None
+    confidence: int | None = Field(default=None, ge=1, le=3)   # 把握程度：1 没把握 / 2 有点把握 / 3 很有把握
 
 
 @router.post("/problems/{pid}/predictions")
@@ -274,18 +275,20 @@ def lock_prediction(pid: str, body: PredictionIn, user: User = Depends(student_u
             hw_answers["ff_signals"] = sorted({s.strip() for s in (hw.ff_signals or []) if s.strip()})
     created = []
     if cells:
-        w = Prediction(user_id=user.id, problem_id=pid, kind="waveform", answers={"cells": cells})
+        w = Prediction(user_id=user.id, problem_id=pid, kind="waveform", answers={"cells": cells},
+                       confidence=body.confidence)
         db.add(w)
         created.append(w)
     if questions:
-        h = Prediction(user_id=user.id, problem_id=pid, kind="hardware", answers=hw_answers)
+        h = Prediction(user_id=user.id, problem_id=pid, kind="hardware", answers=hw_answers,
+                       confidence=body.confidence)
         db.add(h)
         created.append(h)
     db.flush()
     for pred in created:
         log_event(db, user, "predict.submit", problem_id=pid, payload={
             "kind": pred.kind, "cells": len(pred.answers.get("cells", [])) if pred.kind == "waveform" else len(questions),
-            "answers": pred.answers, "prediction_id": pred.id, "accuracy": None})
+            "answers": pred.answers, "prediction_id": pred.id, "accuracy": None, "confidence": body.confidence})
     progress = workflow.get_progress(db, user.id, p, True)
     workflow.on_predictions_locked(progress)
     db.commit()
@@ -325,6 +328,7 @@ def submit_attempt(pid: str, body: AttemptIn, user: User = Depends(student_user)
     db.flush()
     for pred in pending:
         pred.attempt_id = attempt.id
+    attempt.confidence = next((x.confidence for x in pending if x.confidence is not None), None)
     log_event(db, user, "code.submit", problem_id=pid, attempt_id=attempt.id, payload={
         "attempt_id": attempt.id, "code_hash": attempt.code_hash, "lines": code.count("\n") + 1,
         "attempt_no": attempt_no, "step": step})
@@ -348,6 +352,8 @@ def attempt_detail(aid: int, user: User = Depends(student_user), db: DbSession =
         "misconceptions": [{"code": m, "label": MISCONCEPTION_LABELS.get(m, m)}
                            for m in analysis.get("misconceptions", [])],
         "investigation": None, "hints": [], "shuffle": None, "previous": None,
+        "confidence": a.confidence, "confident_miss": bool(analysis.get("confident_miss")),
+        "under_confident": bool(analysis.get("under_confident")),
     }
     if a.status != "done":
         return out

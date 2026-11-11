@@ -1,5 +1,5 @@
 // 做题工作台（docs/pages.md S4）：PRIMM 五步 预测 → 运行 → 探究 → 修改 → 创作
-import { Alert, Button, Input, Progress, Splitter, Switch, Tour, message, type TourProps } from 'antd'
+import { Alert, Button, Input, Progress, Segmented, Splitter, Switch, Tour, message, type TourProps } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { post, ApiError } from '../../api/client'
@@ -20,6 +20,7 @@ import Markdown from '../../lib/markdown'
 import './Workbench.css'
 
 type Phase = 'predicting' | 'ready' | 'running' | 'investigating' | 'make' | 'done'
+const CONFIDENCE_LABEL: Record<number, string> = { 1: '没把握', 2: '有点把握', 3: '很有把握' }
 type Dock = 'wave' | 'hw' | 'shuffle' | 'errors'
 const RUNNING = new Set(['queued', 'running'])
 const EMPTY_HW: HardwareAnswers = { ff_count: null, latch: null, ff_signals: [] }
@@ -75,6 +76,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
   const [editorTab, setEditorTab] = useState<'design' | 'tb'>(step === 'make' ? 'tb' : 'design')
   const [pred, setPred] = useState<Record<string, string | null>>({})
   const [hw, setHw] = useState<HardwareAnswers>(EMPTY_HW)
+  const [confidence, setConfidence] = useState<number | null>(null)   // 预测把握程度 1–3
   const [dock, setDock] = useState<Dock>('wave')
   const [radix, setRadix] = useState<'hex' | 'bin'>('hex')
   const [diffView, setDiffView] = useState(false)
@@ -153,7 +155,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
 
   const allPredicted = predictCells.every((c) => pred[`${c.signal}@${c.step}`]) &&
     (!p.hardware_questions.includes('ff_count') || hw.ff_count !== null) &&
-    (!p.hardware_questions.includes('latch') || hw.latch !== null)
+    (!p.hardware_questions.includes('latch') || hw.latch !== null) && confidence !== null
 
   async function act<T>(fn: () => Promise<T>): Promise<T | undefined> {
     setBusy(true)
@@ -171,7 +173,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
     await act(async () => {
       const cells = predictCells.map((c) => ({ ...c, value: pred[`${c.signal}@${c.step}`] }))
       await post(`/api/student/problems/${p.id}/predictions`, {
-        waveform: { cells }, hardware: p.hardware_questions.length ? hw : undefined,
+        waveform: { cells }, hardware: p.hardware_questions.length ? hw : undefined, confidence,
       })
       setRepredict(false)
       await invalidate(['problem', p.id])
@@ -186,6 +188,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
       setViewAttemptId(r.attempt_id)
       setPred({})
       setHw(EMPTY_HW)
+      setConfidence(null)
       setSelected(null)
       await invalidate(['problem', p.id])
     })
@@ -271,7 +274,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
     (!p.hardware_questions.includes('latch') || hw.latch !== null)
   const waveFilled = predictCells.every((c) => pred[`${c.signal}@${c.step}`])
   const next = nextStep({ p, phase, a, inv, editable, code, waveFilled, hwAnswered, explain, compiled: !!judge && compiled,
-    judged: !!judge, step, tbOk: !!tbQ.data?.result?.ok })
+    judged: !!judge, step, tbOk: !!tbQ.data?.result?.ok, confidence })
   const pulse = (t: Target) => (next.target === t ? ' pulse-box' : '')
   const waveTabPulse = (next.target === 'wave' && dock !== 'wave') || (next.target === 'hw' && dock !== 'hw')
 
@@ -352,7 +355,8 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
           <Splitter.Panel defaultSize={sizes.h?.[0] ?? '24%'} min="14%" max="50%" collapsible>
             <aside className="pane-scroll col" data-testid="col-left" ref={refs.left}>
               <TaskCard p={p} a={a} phase={phase} allPredicted={allPredicted} inv={inv} feedback={feedback}
-                explain={explain} setExplain={setExplain} tb={tbQ.data} repredict={repredict} explainPulse={next.target === 'explain'} />
+                explain={explain} setExplain={setExplain} tb={tbQ.data} repredict={repredict} explainPulse={next.target === 'explain'}
+                confidence={confidence} setConfidence={setConfidence} confidencePulse={next.target === 'confidence'} />
               <SpecCard p={p} />
               <PredictionCard p={p} a={a} phase={phase} />
             </aside>
@@ -442,6 +446,11 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                         {a?.status === 'done' && (a.judge?.tags ?? []).filter((t) => t !== 'sim_mismatch').map((t) =>
                           <div key={t} className="tag-row">· {TAG_LABEL[t] ?? t}</div>)}
                         {a?.misconceptions.map((m) => <div key={m.code} className="tag-row warn">· {m.label}</div>)}
+                        {a?.status === 'done' && a.confident_miss && (
+                          <div className="conf-note miss" data-testid="confident-miss">你选了“很有把握”，但预测没对上。这往往说明有一个自己没意识到的误区——
+                            对照波形找找第一个预测错的格子，弄明白它，比做对一道新题更有收获。</div>)}
+                        {a?.status === 'done' && a.under_confident && (
+                          <div className="conf-note ok" data-testid="under-confident">你选了“没把握”，其实预测对了。你比自己以为的更懂，下次可以更有信心一点。</div>)}
                       </div>
                     </div>
                     <div className="card" ref={refs.hints}>
@@ -473,12 +482,12 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
 
 // ---------------------------------------------------------------- 下一步
 
-type Target = 'editor' | 'wave' | 'hw' | 'primary' | 'explain' | 'tb' | 'hint' | 'none'
+type Target = 'editor' | 'wave' | 'hw' | 'confidence' | 'primary' | 'explain' | 'tb' | 'hint' | 'none'
 
 function nextStep(x: {
   p: ProblemDetail; phase: Phase; a: AttemptDetail | undefined; inv: AttemptDetail['investigation']; editable: boolean
   code: string; waveFilled: boolean; hwAnswered: boolean; explain: string; compiled: boolean; judged: boolean
-  step: Step; tbOk: boolean
+  step: Step; tbOk: boolean; confidence: number | null
 }): { text: string; target: Target } {
   const { p, phase, a, inv } = x
   const signals = p.predict_points.map((pt) => pt.signal).join('、')
@@ -495,6 +504,9 @@ function nextStep(x: {
     }
     if (!x.hwAnswered && p.hardware_questions.length) {
       return { text: '切到“硬件”页，猜一猜：这段代码会综合出几个触发器？有没有锁存器？', target: 'hw' }
+    }
+    if (x.confidence === null) {
+      return { text: '在左边选一下：你对这些预测有多大把握？照实选就行，没有对错，也不影响成绩。', target: 'confidence' }
     }
     return { text: '预测都填好了，点右上角闪烁的“锁定我的预测”。锁定之后就不能再改了。', target: 'primary' }
   }
@@ -561,11 +573,13 @@ function Tick({ done, n }: { done: boolean; n: number | string }) {
   return <div className={done ? 'tick y' : 'tick n'}>{done ? '✓' : n}</div>
 }
 
-function TaskCard({ p, a, phase, allPredicted, inv, feedback, explain, setExplain, tb, repredict, explainPulse }: {
+function TaskCard({ p, a, phase, allPredicted, inv, feedback, explain, setExplain, tb, repredict, explainPulse,
+  confidence, setConfidence, confidencePulse }: {
   p: ProblemDetail; a: AttemptDetail | undefined; phase: Phase; allPredicted: boolean
   inv: AttemptDetail['investigation']; feedback: { step?: string; line?: string }
   explain: string; setExplain: (v: string) => void; tb: ReturnType<typeof useTbSubmission>['data']; repredict: boolean
   explainPulse?: boolean
+  confidence: number | null; setConfidence: (v: number) => void; confidencePulse?: boolean
 }) {
   const step = p.progress.step
   const stepNo: Record<Step, string> = { predict: '①', run: '②', investigate: '③', modify: '④', make: '⑤', done: '✓' }
@@ -587,7 +601,16 @@ function TaskCard({ p, a, phase, allPredicted, inv, feedback, explain, setExplai
           <div className="ans">每个 <Term k="STEP" /> 是一个<Term k="时钟">时钟</Term>周期；单比特点击切换 0/1，多位的点击后输入二进制或 0x 开头的十六进制</div></div></li>
         {p.hardware_questions.length > 0 && <li><Tick done={phase !== 'predicting'} n={3} /><div>在“硬件”里回答：会<Term k="综合">综合</Term>出几个<Term k="触发器">触发器</Term>、有没有<Term k="锁存器">锁存器</Term>
           <div className="ans">纯<Term k="组合逻辑">组合逻辑</Term>没有触发器；always @(posedge clk) 里赋值的信号会变成触发器</div></div></li>}
-        <li><Tick done={phase === 'running'} n={4} /><div>{phase === 'predicting' ? (allPredicted ? '都填好了，点右上角“锁定我的预测”' : '锁定预测后才能运行') : '预测已锁定，点“仿真”'}</div></li>
+        {p.flags.predict_step && (
+          <li data-testid="task-confidence"><Tick done={phase !== 'predicting' || confidence !== null} n={4} /><div>你对这些预测有多大把握？
+            {phase === 'predicting'
+              ? <div className={confidencePulse ? 'conf-pick pulse-box' : 'conf-pick'}>
+                  <Segmented size="small" value={confidence ?? undefined} onChange={(v) => setConfidence(Number(v))} data-testid="confidence"
+                    options={[{ label: '没把握', value: 1 }, { label: '有点把握', value: 2 }, { label: '很有把握', value: 3 }]} /></div>
+              : <div className="ans">{CONFIDENCE_LABEL[p.pending_prediction[0]?.confidence ?? a?.confidence ?? 0] ?? '—'}</div>}
+            <div className="ans">照实选就行：猜错又很有把握的地方，正是最值得弄懂的地方</div></div></li>
+        )}
+        <li><Tick done={phase === 'running'} n={5} /><div>{phase === 'predicting' ? (allPredicted ? '都填好了，点右上角“锁定我的预测”' : '锁定预测后才能运行') : '预测已锁定，点“仿真”'}</div></li>
       </ul>
     )
   } else if (phase === 'investigating' && inv) {

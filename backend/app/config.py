@@ -37,6 +37,7 @@ class Settings:
     pred_threshold: float = field(default_factory=lambda: float(_env("PRED_THRESHOLD", "0.8")))
     f_window: int = 5          # F 值：最近 n 次带预测的尝试
     mastery_window: int = 3    # 掌握等级：最近 m 次
+    confidence_window: int = 10   # 过度自信率、校准偏差：最近 n 次带把握程度的尝试
     # 提交频率限制（docs/data-api.md 第 2 节）
     submit_limit: int = 20
     submit_window_minutes: int = 10

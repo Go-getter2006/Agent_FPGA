@@ -46,7 +46,8 @@ DATA_DICTIONARY = """# 数据字典
 | pred_accuracy | 预测准确率 A_pred；没有预测时为空 |
 | quadrant | 四象限：mastered / fragile / design_gap / concept_gap；编译失败或没有预测为 none |
 | tags | 裁判标签，分号分隔 |
-| max_hint_level_before | 这次提交之前在这道题上请求过的最高提示等级（0–3） |
+| max_hint_level_before | 这次提交之前在这道题上请求过的最高提示等级（0–4，4 表示看过参考答案） |
+| confidence | 锁定预测时选的把握程度：1 没把握 / 2 有点把握 / 3 很有把握；没选为空 |
 
 ## metrics.csv（一行一个学生 × 知识点）
 | 字段 | 含义 |
@@ -59,6 +60,8 @@ DATA_DICTIONARY = """# 数据字典
 | B | 该学生的盲改率（全部题目） |
 | H | 该学生的提示依赖度 |
 | tb_score | 该学生各创作题最近一次 testbench 得分的平均值 |
+| O | 该学生的过度自信率：最近 10 次带把握程度的尝试里，选“很有把握”却预测没达标的比例 |
+| Cal | 该学生的校准偏差：mean(q(c) − A_pred)，q = 1/3、2/3、1；大于 0 为高估 |
 """
 
 
@@ -96,7 +99,7 @@ def build_export(db: DbSession, class_id: int, kinds: list[str], out_path: Path)
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(["anon_id", "group", "problem_id", "attempt_no", "created_at", "sim_ok", "pred_accuracy",
-                    "quadrant", "tags", "max_hint_level_before"])
+                    "quadrant", "tags", "max_hint_level_before", "confidence"])
         n = 0
         for a in cd.attempts:
             if a.user_id not in consented:
@@ -104,7 +107,8 @@ def build_export(db: DbSession, class_id: int, kinds: list[str], out_path: Path)
             w.writerow([anon[a.user_id], group[a.user_id], a.problem_id, a.attempt_no, _iso(a.created_at),
                         int(bool(a.sim_ok)), "" if a.pred_accuracy is None else f"{a.pred_accuracy:.4f}",
                         a.quadrant or "none", ";".join((a.judge or {}).get("tags", [])),
-                        ta.hint_level_before(cd, a.user_id, a.problem_id, a.created_at)])
+                        ta.hint_level_before(cd, a.user_id, a.problem_id, a.created_at),
+                        "" if a.confidence is None else a.confidence])
             n += 1
         files["attempts.csv"] = buf.getvalue()
         counts["attempts"] = n
@@ -112,7 +116,8 @@ def build_export(db: DbSession, class_id: int, kinds: list[str], out_path: Path)
     if "metrics" in kinds:
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["anon_id", "group", "knowledge_point", "level", "r_code", "r_pred", "f_value", "B", "H", "tb_score"])
+        w.writerow(["anon_id", "group", "knowledge_point", "level", "r_code", "r_pred", "f_value", "B", "H", "tb_score",
+                    "O", "Cal"])
         fmt = lambda v: "" if v is None else f"{v:.4f}"  # noqa: E731
         n = 0
         heat = {r["user_id"]: r["cells"] for r in ta.heatmap(cd, None, None, None)["rows"]}
@@ -125,10 +130,11 @@ def build_export(db: DbSession, class_id: int, kinds: list[str], out_path: Path)
                 if t.user_id == s.user_id and t.score is not None:
                     latest[t.problem_id] = t.score
             tb = sum(latest.values()) / len(latest) if latest else None
+            o, cal = ta.overconfidence(cd, s.user_id)[0], ta.calibration(cd, s.user_id)
             for kp in cd.kps:
                 c = cells[kp.code]
                 w.writerow([s.anon_id, s.group, kp.code, c["level"], fmt(c["r_code"]), fmt(c["r_pred"]),
-                            fmt(c["f_value"]), fmt(b), fmt(h), fmt(tb)])
+                            fmt(c["f_value"]), fmt(b), fmt(h), fmt(tb), fmt(o), fmt(cal)])
                 n += 1
         files["metrics.csv"] = buf.getvalue()
         counts["metrics"] = n

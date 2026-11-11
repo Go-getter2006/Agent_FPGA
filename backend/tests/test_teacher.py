@@ -420,3 +420,36 @@ def test_create_assignment(gen):
     r = client.post(f"/api/teacher/classes/{cid}/assignments", json={
         "title": "x", "problem_ids": ["nope"], "open_at": "2026-11-10T08:00:00", "due_at": "2026-11-11T08:00:00"})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------- 预测把握程度（第 4.7 节）
+
+def test_overconfidence_and_calibration_match_sql(gen):
+    cid = gen["class_id"]
+    rows = sql(f"""
+        WITH c AS (
+          SELECT a.user_id, a.confidence, a.pred_accuracy,
+                 ROW_NUMBER() OVER (PARTITION BY a.user_id ORDER BY a.created_at DESC, a.id DESC) AS rn
+          FROM attempts a
+          WHERE a.status = 'done' AND a.confidence IS NOT NULL AND a.pred_accuracy IS NOT NULL
+            AND a.quadrant IN ('mastered', 'fragile', 'design_gap', 'concept_gap')
+            AND a.user_id IN {members(cid, 'treatment')})
+        SELECT user_id,
+               SUM(CASE WHEN confidence = 3 AND pred_accuracy < 0.8 - 1e-9 THEN 1 ELSE 0 END),
+               SUM(CASE WHEN confidence = 3 THEN 1 ELSE 0 END),
+               AVG((CASE confidence WHEN 1 THEN 1.0 / 3 WHEN 2 THEN 2.0 / 3 ELSE 1.0 END) - pred_accuracy)
+        FROM c WHERE rn <= 10 GROUP BY user_id""")
+    assert len(rows) >= 25
+    flagged = 0
+    for uid, miss, sure, cal in rows:
+        d = gen["client"].get(f"/api/teacher/students/{uid}").json()
+        assert approx(d["overconfidence"], miss / sure if sure else None), uid
+        assert approx(d["calibration_bias"], cal), uid
+        flagged += bool(sure >= 3 and miss / sure >= 0.5)
+    alerts = gen["client"].get(f"/api/teacher/classes/{cid}/overview").json()["alerts"]
+    rule5 = {a["user_id"] for a in alerts if any(r["rule"] == 5 for r in a["reasons"])}
+    assert len(rule5) == flagged and flagged > 0           # 第 5 条关注规则：过度自信
+    # 对照组没有预测，也就没有把握程度
+    for (uid,) in sql('SELECT user_id FROM enrollments WHERE class_id = :c AND "group" = \'control\' LIMIT 3', c=cid):
+        d = gen["client"].get(f"/api/teacher/students/{uid}").json()
+        assert d["overconfidence"] is None and d["calibration_bias"] is None

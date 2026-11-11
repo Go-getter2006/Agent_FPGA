@@ -10,10 +10,12 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
+from ..config import get_settings
 from ..db import utcnow
 from ..models import Attempt, Hint, Prediction, Problem, ReviewItem, ShuffleRun, TbSubmission, User
-from .learner_model import MISCONCEPTION_LABELS, PRACTICE_KP, TAG_LABELS, TbView, latest_tb_scores
-from .mastery import kp_summaries
+from .learner_model import (MISCONCEPTION_LABELS, PRACTICE_KP, TAG_LABELS, TbView, calibration_bias,
+                            latest_tb_scores, overconfidence_rate, with_confidence)
+from .mastery import attempt_views, kp_summaries
 from .review_scheduler import BEIJING
 
 
@@ -105,6 +107,17 @@ def student_report(db: DbSession, user: User, brief: bool = False) -> dict:
     if tb_full:
         badges.append({"code": "tb_full", "label": f"testbench 满分 ×{tb_full}"})
 
+    # 预测把握度（第 4.7 节）：很有把握却没预测对的题，最值得回头弄明白
+    s_ = get_settings()
+    views = attempt_views(db, user.id)
+    recent_conf = with_confidence(views, s_.confidence_window)
+    confident_misses = [{"attempt_id": a.id, "problem_id": a.problem_id, "title": problems[a.problem_id].title,
+                         "pred_accuracy": a.pred_accuracy, "created_at": a.created_at}
+                        for a in attempts if (a.analysis or {}).get("confident_miss")][-5:][::-1]
+    calibration = {"overconfidence": overconfidence_rate(views, s_.confidence_window),
+                   "bias": calibration_bias(views, s_.confidence_window), "n": len(recent_conf),
+                   "confident_misses": confident_misses}
+
     hints = db.execute(select(Hint, Attempt.problem_id).join(Attempt, Attempt.id == Hint.attempt_id)
                        .where(Attempt.user_id == user.id).order_by(Hint.id.desc()).limit(10)).all()
     upcoming = db.scalars(select(ReviewItem).where(ReviewItem.user_id == user.id, ReviewItem.status == "active")
@@ -120,6 +133,7 @@ def student_report(db: DbSession, user: User, brief: bool = False) -> dict:
             "tb": latest_tb,
         },
         "mastery": mastery,
+        "calibration": calibration,
         "trend": trend,
         "fragile_list": fragile_list,
         "misconceptions": misconceptions,
