@@ -23,8 +23,8 @@ from ..models import (Assignment, Attempt, Enrollment, Event, Hint, Investigatio
                       Problem, Progress, ShuffleRun, TbSubmission, User)
 from . import fallback_hints
 from .learner_model import (MISCONCEPTION_LABELS, QUADRANTS, TAG_LABELS, AttemptView, LookEvent, Submission,
-                            class_f_value, f_counts, f_value, is_look_event, mastery_level,
-                            prediction_ok, r_values)
+                            calibration_bias, class_f_value, f_counts, f_value, is_look_event, mastery_level,
+                            overconfidence_rate, prediction_ok, r_values, with_confidence)
 
 BEIJING = timezone(timedelta(hours=8))
 CORE_KPS = ("blocking", "sequential", "fsm", "parallel")
@@ -154,7 +154,8 @@ def views(cd: ClassData, *, users: set[int] | None = None, kp: str | None = None
         if after and a.created_at < after:
             continue
         out[a.user_id].append(AttemptView(a.created_at, bool(a.sim_ok),
-                                          bool(prediction_ok(a.pred_accuracy, theta)), a.quadrant, a.problem_id))
+                                          bool(prediction_ok(a.pred_accuracy, theta)), a.quadrant, a.problem_id,
+                                          pred_accuracy=a.pred_accuracy, confidence=a.confidence))
     return out
 
 
@@ -253,6 +254,18 @@ def blind(cd: ClassData, users: set[int], problem: str | None = None, last_n: in
 
 # ---------------------------------------------------------------- T1 班级概览
 
+def overconfidence(cd: ClassData, uid: int) -> tuple[float | None, int]:
+    """过度自信率 O 和其分母（最近 n 次带把握程度的尝试里选“很有把握”的次数），第 4.7 节。"""
+    vs = views(cd, users={uid}).get(uid, [])
+    n = get_settings().confidence_window
+    sure = [v for v in with_confidence(vs, n) if v.confidence == 3]
+    return overconfidence_rate(vs, n), len(sure)
+
+
+def calibration(cd: ClassData, uid: int) -> float | None:
+    return calibration_bias(views(cd, users={uid}).get(uid, []), get_settings().confidence_window)
+
+
 def alerts(cd: ClassData, users: set[int], now: datetime) -> list[dict]:
     """需要关注的学生（docs/learner-model.md 第 6 节，满足任一条即列入）。"""
     names = {k.code: k.name for k in cd.kps}
@@ -277,6 +290,9 @@ def alerts(cd: ClassData, users: set[int], now: datetime) -> list[dict]:
         b, nb, nr = blind(cd, {s.user_id}, last_n=10)
         if b is not None and b >= 0.7:
             reasons.append({"rule": 4, "text": f"近 {nr} 次重复提交，盲改率 {b:.0%}"})
+        o, k = overconfidence(cd, s.user_id)
+        if o is not None and k >= 3 and o >= 0.5:
+            reasons.append({"rule": 5, "text": f"“很有把握”的 {k} 次预测里 {o:.0%} 没对上（过度自信）"})
         if reasons:
             out.append({"user_id": s.user_id, "alias": s.alias, "name": s.name, "group": s.group, "reasons": reasons})
     return out
@@ -469,7 +485,8 @@ def student_detail(cd: ClassData, uid: int) -> dict:
                          "quadrant": a.quadrant, "sim_ok": a.sim_ok, "pred_accuracy": a.pred_accuracy,
                          "tags": (a.judge or {}).get("tags", []),
                          "misconceptions": (a.analysis or {}).get("misconceptions", []),
-                         "max_hint_level": max((h.level for h, x in cd.hints if x.id == a.id), default=0)})
+                         "max_hint_level": max((h.level for h, x in cd.hints if x.id == a.id), default=0),
+                         "confidence": a.confidence, "confident_miss": bool((a.analysis or {}).get("confident_miss"))})
     kps = []
     for kp in cd.kps:
         vs = views(cd, users={uid}, kp=kp.code).get(uid, [])
@@ -484,6 +501,7 @@ def student_detail(cd: ClassData, uid: int) -> dict:
         "user_id": uid, "alias": s.alias, "name": s.name, "group": s.group, "consent": s.consent,
         "timeline": timeline, "knowledge_points": kps,
         "blind_rate": b, "resubmissions": nr, "hint_dependence": avg_hint_level(cd, {uid}),
+        "overconfidence": overconfidence(cd, uid)[0], "calibration_bias": calibration(cd, uid),
         "tb": [{"problem_id": p, "title": cd.problems[p].title, "score": t.score} for p, t in latest_tb.items()],
         "shuffle": [{"attempt_id": a.id, "problem_id": a.problem_id, "order_sensitive": (r.result or {}).get("order_sensitive"),
                      "prediction": r.prediction} for r, a in cd.shuffles if a.user_id == uid],

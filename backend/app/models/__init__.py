@@ -121,6 +121,7 @@ class Attempt(Base):
     quadrant: Mapped[str | None] = mapped_column(String(16), nullable=True)
     analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # 预测逐格对照、预测误区
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)   # 这次预测的把握程度 1–3（没预测为空）
 
 
 class Prediction(Base):
@@ -134,6 +135,7 @@ class Prediction(Base):
     accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # 判完后每格的对照
     locked_at = mapped_column(UTCDateTime, default=utcnow)
+    confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)   # 1 没把握 / 2 有点把握 / 3 很有把握
 
 
 class Investigation(Base):

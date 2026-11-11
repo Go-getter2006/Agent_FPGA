@@ -124,6 +124,8 @@ class AttemptView:
     pred_ok: bool
     quadrant: str
     problem_id: str = ""
+    pred_accuracy: float | None = None
+    confidence: int | None = None          # 预测把握程度 1–3，没选为空
 
 
 def counted(attempts: list[AttemptView]) -> list[AttemptView]:
@@ -333,3 +335,38 @@ def summarize_kp(code: str, attempts: list[AttemptView], *, n: int = 5, m: int =
     r_code, r_pred = r_values(attempts, m)
     return KpSummary(code=code, level=mastery_level(attempts, m), r_code=r_code, r_pred=r_pred,
                      f_value=f_value(attempts, n), attempts=len(counted(attempts)))
+
+
+# ---------------------------------------------------------------- 预测把握程度与校准（第 4.7 节）
+
+CONFIDENCE_LABELS = {1: "没把握", 2: "有点把握", 3: "很有把握"}
+CONFIDENCE_PROB = {1: 1 / 3, 2: 2 / 3, 3: 1.0}       # 把握程度对应的主观概率 q(c)
+
+
+def confidence_flags(confidence: int | None, pred_ok: bool | None) -> dict:
+    """一次尝试的标记：很有把握却预测没过阈值（confident_miss）、没把握却预测对了（under_confident）。"""
+    if confidence is None or pred_ok is None:
+        return {"confident_miss": False, "under_confident": False}
+    return {"confident_miss": confidence == 3 and not pred_ok, "under_confident": confidence == 1 and pred_ok}
+
+
+def with_confidence(attempts: list[AttemptView], n: int = 10) -> list[AttemptView]:
+    """最近 n 次选了把握程度、且预测能判定的尝试（按时间）。"""
+    rows = [a for a in counted(attempts) if a.confidence in CONFIDENCE_PROB and a.pred_accuracy is not None]
+    return rows[-n:]
+
+
+def overconfidence_rate(attempts: list[AttemptView], n: int = 10) -> float | None:
+    """过度自信率 O = N(c=3, p=0) / N(c=3)，范围是最近 n 次带把握程度的尝试；分母为 0 时为空。"""
+    sure = [a for a in with_confidence(attempts, n) if a.confidence == 3]
+    if not sure:
+        return None
+    return sum(1 for a in sure if not a.pred_ok) / len(sure)
+
+
+def calibration_bias(attempts: list[AttemptView], n: int = 10) -> float | None:
+    """校准偏差 Cal = mean(q(c_i) − a_i)：大于 0 说明高估了自己，小于 0 说明低估了自己。"""
+    rows = with_confidence(attempts, n)
+    if not rows:
+        return None
+    return sum(CONFIDENCE_PROB[a.confidence] - a.pred_accuracy for a in rows) / len(rows)

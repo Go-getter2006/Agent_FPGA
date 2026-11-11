@@ -29,7 +29,8 @@ def attempt_views(db: DbSession, user_id: int, kp: str | None = None) -> list[At
             continue
         out.append(AttemptView(created_at=attempt.created_at, sim_ok=bool(attempt.sim_ok),
                                pred_ok=bool(prediction_ok(attempt.pred_accuracy, theta)),
-                               quadrant=attempt.quadrant, problem_id=attempt.problem_id))
+                               quadrant=attempt.quadrant, problem_id=attempt.problem_id,
+                               pred_accuracy=attempt.pred_accuracy, confidence=attempt.confidence))
     return out
 
 

@@ -46,7 +46,7 @@ export interface ProblemDetail {
               modify_phase: boolean; tb_done: boolean }
   editable: boolean; code: string
   attempts: AttemptSummary[]; latest_attempt_id: number | null
-  pending_prediction: { id: number; kind: 'waveform' | 'hardware'; answers: any; locked_at: string }[]
+  pending_prediction: { id: number; kind: 'waveform' | 'hardware'; answers: any; locked_at: string; confidence: number | null }[]
   latest_tb: TbSubmission | null
   flags: Record<string, boolean>
   stage: string
@@ -113,6 +113,7 @@ export interface AttemptDetail extends AttemptSummary {
   problem_id: string; code: string; finished_at: string | null
   judge: Judge | null; expected: TraceRow[] | null; evaluation: Evaluation | null
   predictions: { id: number; kind: string; answers: any; accuracy: number | null }[]
+  confidence: number | null; confident_miss: boolean; under_confident: boolean
   misconceptions: { code: string; label: string }[]
   investigation: InvestigationStatus | null
   hints: Hint[]
@@ -144,6 +145,8 @@ export interface ReportData {
           waveform_accuracy_delta: number | null
           tb: { problem_id: string; title: string; score: number | null; caught: number; total: number } | null }
   mastery: MasteryItem[]
+  calibration: { overconfidence: number | null; bias: number | null; n: number
+                 confident_misses: { attempt_id: number; problem_id: string; title: string; pred_accuracy: number | null; created_at: string }[] }
   trend: { week: string; waveform: number | null; hardware: number | null }[]
   fragile_list: { problem_id: string; title: string; reason: string; attempt_id: number }[]
   misconceptions: { code: string; label: string; count: number; latest_problem: string;

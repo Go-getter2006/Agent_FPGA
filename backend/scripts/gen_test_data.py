@@ -34,7 +34,7 @@ from backend.app.services import fallback_hints
 from backend.app.services.consent import current_consent
 from backend.app.services.events import log_event
 from backend.app.services.flags import DEFAULT_FLAGS
-from backend.app.services.learner_model import (evaluate_prediction, prediction_misconceptions, prediction_ok,
+from backend.app.services.learner_model import (confidence_flags, evaluate_prediction, prediction_misconceptions, prediction_ok,
                                                 quadrant)
 from backend.app.services.problems_sync import sync_all
 from backend.app.services.security import anon_id_for, hash_password
@@ -202,20 +202,26 @@ def generate(seed: int = 2026, per_group: int = 30, attempts_each: int = 20, wee
                 sim_ok = bool(compiled and diag["sim"]["ok"])
                 acc = evaluation["accuracy"] if evaluation else None
                 q = quadrant(sim_ok, prediction_ok(acc, theta), compiled)
+                conf = None
+                if treated:   # 把握程度：大体随预测水平走，偏自信的学生更常选“很有把握”
+                    lean = 0.35 if u.id % 4 == 0 else 0.0
+                    r = rng.random() * 0.6 + (acc if acc is not None else 0.5) * 0.4 + lean
+                    conf = 3 if r > 0.75 else 2 if r > 0.45 else 1
                 step = "modify" if st["modify_phase"] else "run"
                 a = Attempt(user_id=u.id, problem_id=pid, attempt_no=per_problem[pid], step=step, code=code,
                             code_hash=hashlib.sha256(code.encode()).hexdigest(), created_at=t,
                             finished_at=t + timedelta(seconds=4), status="done", judge=diag, sim_ok=sim_ok,
-                            pred_accuracy=acc, quadrant=q,
+                            pred_accuracy=acc, quadrant=q, confidence=conf,
                             analysis={"evaluation": evaluation,
-                                      "misconceptions": prediction_misconceptions(evaluation, diag) if evaluation else []})
+                                      "misconceptions": prediction_misconceptions(evaluation, diag) if evaluation else [],
+                                      **confidence_flags(conf, prediction_ok(acc, theta) if compiled else None)})
                 db.add(a)
                 db.flush()
                 counts["attempts"] += 1
                 if treated:
                     for kind, ans in (("waveform", waveform), ("hardware", hardware)):
                         db.add(Prediction(user_id=u.id, problem_id=pid, attempt_id=a.id, kind=kind, answers=ans,
-                                          locked_at=t - timedelta(seconds=30),
+                                          locked_at=t - timedelta(seconds=30), confidence=conf,
                                           accuracy=(evaluation or {}).get(kind, {}).get("accuracy") if evaluation else None,
                                           result=(evaluation or {}).get(kind) if evaluation else None))
                 log_event(db, u, "code.submit", problem_id=pid, attempt_id=a.id, ts=t,

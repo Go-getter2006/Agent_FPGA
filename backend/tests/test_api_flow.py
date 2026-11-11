@@ -408,3 +408,31 @@ def test_problem_list_and_home(student):
     assert [p["id"] for p in fsm_only] == ["seq_detector_101"]
     home = client.get("/api/student/home").json()
     assert len(home["mastery"]) == 11 and home["review_due"] == 0
+
+
+# ---------------------------------------------------------------- 预测把握程度（第 4.7 节）
+
+def test_confidence_recorded_and_flagged(student):
+    user, client = student
+    pid = "counter_mod10"
+    detail = client.get(f"/api/student/problems/{pid}").json()
+    widths = {o["name"]: o["width"] for o in detail["skeleton"]["outputs"]}
+    cells = [{"signal": p["signal"], "step": s, "value": "0xF"} for p in detail["predict_points"] for s in p["steps"]]
+    r = client.post(f"/api/student/problems/{pid}/predictions",
+                    json={"waveform": {"cells": cells}, "hardware": {"ff_count": 4, "latch": False, "ff_signals": ["q"]},
+                          "confidence": 3})
+    assert r.status_code == 200, r.text
+    assert widths["q"] == 4
+    assert client.get(f"/api/student/problems/{pid}").json()["pending_prediction"][0]["confidence"] == 3
+    attempt = submit(client, pid, ref_code(pid))
+    assert attempt["confidence"] == 3 and attempt["sim_ok"] is True
+    assert attempt["confident_miss"] is True and attempt["quadrant"] == "fragile"   # 很有把握，预测却全错
+    with SessionLocal() as db:
+        ev = db.scalar(select(Event).where(Event.user_id == user.id, Event.type == "predict.submit").order_by(Event.id))
+        assert ev.payload["confidence"] == 3
+    cal = client.get("/api/student/report").json()["calibration"]
+    assert cal["overconfidence"] == 1.0 and cal["n"] == 1 and cal["confident_misses"][0]["problem_id"] == pid
+    assert cal["bias"] == pytest.approx(1.0 - attempt["pred_accuracy"])     # q(3) = 1 减去实际准确率
+    # 把握程度只能是 1–3
+    r = client.post(f"/api/student/problems/{pid}/predictions", json={"waveform": {"cells": cells}, "confidence": 5})
+    assert r.status_code == 400

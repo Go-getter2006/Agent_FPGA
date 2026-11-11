@@ -35,3 +35,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .beginner-banner .card-b { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .beginner-banner b { font-size: 15px; }
 .bb-actions { display: flex; gap: 8px; }
+
+.calib-nums { display: flex; gap: 40px; flex-wrap: wrap; }
+.calib-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.calib-nums .big { font-size: 26px; font-weight: 600; }
+.calib-verdict { margin-top: 10px; font-size: 14px; }
+.calib-list { margin-top: 6px; font-size: 13px; }

@@ -146,3 +146,9 @@
 .pane-scroll::-webkit-scrollbar-thumb, .msgs::-webkit-scrollbar-thumb, .dock-body::-webkit-scrollbar-thumb,
 [data-testid="wave-scroll"]::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 5px; }
 [data-testid="wave-scroll"]::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 5px; }
+
+/* 预测把握程度 */
+.conf-pick { margin-top: 6px; display: inline-block; border-radius: 6px; }
+.conf-note { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; }
+.conf-note.miss { background: #FFF7ED; color: #9A3412; }
+.conf-note.ok { background: #F0FDF4; color: #166534; }

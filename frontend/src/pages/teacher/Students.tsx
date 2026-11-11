@@ -40,7 +40,8 @@ export default function Students() {
                   <span>{t.title} <span className="muted">#{t.attempt_no}</span></span>
                   <span style={{ fontSize: 12 }}><QuadrantBadge quadrant={t.quadrant} withHint={false} />
                     <span className="muted" style={{ marginLeft: 6 }}>{t.tags.filter((x: string) => x !== 'sim_mismatch').map((x: string) => TAG_LABEL[x] ?? x).join('；')}</span></span>
-                  <span>预测 {percent(t.pred_accuracy)}</span>
+                  <span>预测 {percent(t.pred_accuracy)}{t.confidence ? ` · ${['', '没把握', '有点把握', '很有把握'][t.confidence]}` : ''}
+                    {t.confident_miss && <span className="bad" title="很有把握却预测没对上"> ⚠</span>}</span>
                   <span>{t.max_hint_level >= 4 ? '看过参考答案' : `提示 ${t.max_hint_level} 级`}</span>
                 </div>
                 {open === t.attempt_id && <AttemptDetail aid={t.attempt_id} />}
@@ -52,6 +53,10 @@ export default function Students() {
               <div className="card-b">
                 <div className="kv-row"><span>盲改率</span><b>{percent(q.data.blind_rate)}</b><span className="muted">（{q.data.resubmissions} 次重复提交）</span></div>
                 <div className="kv-row"><span>提示依赖度 H</span><b>{q.data.hint_dependence === null ? '—' : q.data.hint_dependence.toFixed(1)}</b></div>
+                <div className="kv-row" data-testid="t-overconfidence"><span>过度自信率 O</span><b>{percent(q.data.overconfidence)}</b>
+                  <span className="muted">（“很有把握”却没预测对）</span></div>
+                <div className="kv-row"><span>校准偏差 Cal</span><b>{q.data.calibration_bias === null ? '—' : `${q.data.calibration_bias > 0 ? '+' : ''}${Math.round(q.data.calibration_bias * 100)}%`}</b>
+                  <span className="muted">（+ 高估，− 低估）</span></div>
                 <div className="kv-row"><span>testbench</span><b>{q.data.tb.map((t: any) => `${t.title} ${Math.round((t.score ?? 0) * 100)}%`).join('；') || '—'}</b></div>
                 <div className="kv-row"><span>顺序打乱实验</span><b>{q.data.shuffle.length ? `${q.data.shuffle.filter((s: any) => s.order_sensitive).length} 次顺序相关 / 共 ${q.data.shuffle.length} 次` : '—'}</b></div>
               </div></div>

@@ -2,6 +2,7 @@
 import { Button } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { useReport } from '../../api/hooks'
+import type { ReportData } from '../../api/types'
 import { Empty, ErrorState, KpiCard, Loading, MASTERY_LEGEND, MasteryMap } from '../../components/Common'
 import TrendChart from '../../components/TrendChart'
 import { beijingTime, percent } from '../../lib/format'
@@ -79,7 +80,38 @@ export default function Report() {
           </div>
         </div>
       </div>
+      <CalibrationCard c={d.calibration} onOpen={(pid) => navigate(`/student/problems/${pid}`)} />
       <p className="note">这里不显示排名，也不和同学比较。</p>
+    </div>
+  )
+}
+
+/** 预测把握度（docs/learner-model.md 4.7 节）：自己觉得有把握的程度，和实际预测对不对，是否一致 */
+function CalibrationCard({ c, onOpen }: { c: ReportData['calibration']; onOpen: (pid: string) => void }) {
+  const bias = c.bias
+  const verdict = bias === null ? '还没有数据：锁定预测时选一下把握程度，这里会显示你的估计准不准'
+    : bias > 0.15 ? '你常常比实际更有把握：猜之前多想一步“为什么”，尤其是时序电路在哪个时钟沿更新'
+      : bias < -0.15 ? '你常常低估自己：其实预测得不错，可以更有信心一点'
+        : '你对自己的估计比较准：知道自己哪里会、哪里不会，这是很重要的能力'
+  return (
+    <div className="card" style={{ marginTop: 16 }} data-testid="calibration-card">
+      <div className="card-h">预测把握度 <small>最近 {c.n} 次带把握程度的预测</small></div>
+      <div className="card-b calib">
+        <div className="calib-nums">
+          <div><span className="big">{c.overconfidence === null ? '—' : `${Math.round(c.overconfidence * 100)}%`}</span>
+            <span className="muted">选“很有把握”却没预测对的比例</span></div>
+          <div><span className="big">{bias === null ? '—' : `${bias > 0 ? '+' : ''}${Math.round(bias * 100)}%`}</span>
+            <span className="muted">把握程度比实际准确率高（+）或低（−）多少</span></div>
+        </div>
+        <p className="calib-verdict">{verdict}</p>
+        {c.confident_misses.length > 0 && (
+          <div className="calib-list"><b>很有把握却没对上的题</b>（最值得回头弄明白）：
+            {c.confident_misses.map((m) => (
+              <Button key={m.attempt_id} type="link" size="small" onClick={() => onOpen(m.problem_id)}>{m.title}</Button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -236,3 +236,45 @@ def test_misconception_order_belief():
     assert order_belief_misconception("same", True) is True        # 以为不变，其实依赖顺序
     assert order_belief_misconception("same", False) is False
     assert order_belief_misconception(None, True) is False         # 没预测
+
+
+# ---------------------------------------------------------------- 4.7 预测把握程度与校准
+
+from backend.app.services.learner_model import (  # noqa: E402
+    calibration_bias, confidence_flags, overconfidence_rate, with_confidence)
+
+
+def cv(i: int, acc: float, conf: int | None, c: int = 1) -> AttemptView:
+    """带预测准确率和把握程度的尝试；p 按 θ = 0.8 判定。"""
+    p = acc >= 0.8
+    return AttemptView(created_at=t(i), sim_ok=bool(c), pred_ok=p, quadrant=quadrant(bool(c), p),
+                       pred_accuracy=acc, confidence=conf)
+
+
+def test_overconfidence_rate_hand_computed():
+    # 很有把握 3 次：1.0（对）、0.5（错）、0.25（错）→ O = 2/3；其他把握程度不进分母
+    rows = [cv(1, 1.0, 3), cv(2, 0.5, 3), cv(3, 0.25, 3), cv(4, 0.0, 1), cv(5, 1.0, 2)]
+    assert overconfidence_rate(rows) == pytest.approx(2 / 3)
+    assert overconfidence_rate([cv(1, 0.5, 2)]) is None          # 没选过“很有把握”：空
+    assert overconfidence_rate([cv(1, 0.5, None)]) is None       # 没选把握程度的尝试不算
+
+
+def test_calibration_bias_hand_computed():
+    # q(3) − 0.5 = 0.5；q(1) − 1.0 = −2/3；q(2) − 2/3 = 0 → 平均 (0.5 − 2/3 + 0) / 3
+    rows = [cv(1, 0.5, 3), cv(2, 1.0, 1), cv(3, 2 / 3, 2)]
+    assert calibration_bias(rows) == pytest.approx((0.5 - 2 / 3) / 3)
+    assert calibration_bias([]) is None
+
+
+def test_confidence_window_uses_latest_n():
+    rows = [cv(i, 0.0, 3) for i in range(1, 6)] + [cv(i, 1.0, 3) for i in range(6, 16)]
+    assert len(with_confidence(rows, 10)) == 10
+    assert overconfidence_rate(rows, 10) == 0.0                 # 最近 10 次都对了，早期的错不再计入
+
+
+def test_confidence_flags():
+    assert confidence_flags(3, False) == {"confident_miss": True, "under_confident": False}
+    assert confidence_flags(1, True) == {"confident_miss": False, "under_confident": True}
+    assert confidence_flags(2, False) == {"confident_miss": False, "under_confident": False}
+    assert confidence_flags(None, False) == {"confident_miss": False, "under_confident": False}
+    assert confidence_flags(3, None) == {"confident_miss": False, "under_confident": False}   # 编译没过：不判定
