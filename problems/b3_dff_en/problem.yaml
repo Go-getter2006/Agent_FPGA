@@ -8,7 +8,7 @@ stage: beginner
 starter: starter.v
 predict_points:
   - {signal: q, steps: [2, 3, 5, 7]}
-hardware_questions: [ff_count, latch, ff_signals]
+hardware_questions: [ff_count, ff_signals]          # 入门题少问一点：学完第 5 课再问全三个
 expected_ff_count: 1        # q 一位
 expected_drivers:
   q: [11, 12]

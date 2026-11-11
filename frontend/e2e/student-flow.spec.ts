@@ -55,6 +55,7 @@ async function predict(page: Page, values: Record<number, '0' | '1'>, hw: { ff: 
     if (v === '1') await cell.click()        // 第二次点击：1
   }
   await page.getByTestId('dock-hw').click()
+  await expect(page.getByTestId('hw-how-ff_count')).toBeVisible()       // 每个问题下面都写着怎么判断
   await page.getByLabel('会综合出几个触发器').fill(String(hw.ff))
   await page.getByTestId('hardware-predict').getByText('无', { exact: true }).click()
   const select = page.getByTestId('hardware-predict').locator('.ant-select-selector')
@@ -109,6 +110,12 @@ test('学生从登录走完一道创作题的全部步骤', async ({ page }) => 
   await expect(page.locator('.steps li.cur')).toContainText('探究')
   await expect(page.getByTestId('quadrant-badge')).toBeVisible()
   await expect(page.getByTestId('pred-accuracy')).toContainText('预测准确率')
+  // 硬件页：运行之后逐个信号解释为什么（state 在时钟沿赋值 → 触发器；out 由 assign 决定 → 组合逻辑）
+  await page.getByTestId('dock-hw').click()
+  await expect(page.getByTestId('hw-why')).toContainText('always @(posedge clk)')
+  await expect(page.getByTestId('why-state')).toBeVisible()
+  await expect(page.getByTestId('hw-why')).toContainText('组合逻辑')
+  await page.getByTestId('dock-wave').click()
 
   // 提示阶梯：1 级思路（问题里点出第 5 步）
   await page.getByTestId('hint-request').click()

@@ -152,3 +152,16 @@
 .conf-note { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; }
 .conf-note.miss { background: #FFF7ED; color: #9A3412; }
 .conf-note.ok { background: #F0FDF4; color: #166534; }
+
+/* 硬件页：怎么判断、为什么 */
+.hw-how { font-size: 12px; color: var(--c-text-2); line-height: 1.6; margin-top: 2px; }
+.hw-how .link-btn { padding: 0 0 0 4px; }
+.hw-why { margin-top: 14px; border-top: 1px dashed var(--c-border); padding-top: 10px; }
+.hw-why-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.hw-why-row { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: baseline; font-size: 13px; padding: 4px 0; }
+.hw-why-row .sig-chip { cursor: pointer; }
+.hw-why-row .sig-chip.on { border-color: #D97706; background: var(--c-link); }
+.hw-why-row .kind { font-size: 12px; padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.hw-why-row .kind.ff { background: #E0E7FF; color: #3730A3; }
+.hw-why-row .kind.latch { background: #FEF3C7; color: #92400E; }
+.hw-why-row .kind.comb { background: #F3F4F6; color: #374151; }

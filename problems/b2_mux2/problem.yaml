@@ -8,7 +8,7 @@ stage: beginner
 starter: starter.v
 predict_points:
   - {signal: y, steps: [1, 2, 4, 6]}
-hardware_questions: [ff_count, latch]
+hardware_questions: [ff_count]          # 入门题少问一点：学完第 5 课再问全三个
 expected_ff_count: 0        # 纯组合电路
 expected_drivers:
   y: [10]
