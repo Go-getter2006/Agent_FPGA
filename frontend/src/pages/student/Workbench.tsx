@@ -412,7 +412,9 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                             ? <HardwarePredict questions={p.hardware_questions} value={hw} onChange={setHw} candidates={regCandidates(code || p.starter || '')} />
                             : phase === 'ready'
                               ? <HardwarePredict questions={p.hardware_questions} value={{ ...EMPTY_HW, ...(pendingHw?.answers ?? {}) }} onChange={() => undefined} candidates={[]} disabled />
-                              : <HardwareCompare items={a?.evaluation?.hardware.items ?? null} hardware={judge?.hardware ?? null} questions={p.hardware_questions} />}
+                              : <HardwareCompare items={a?.evaluation?.hardware.items ?? null} hardware={judge?.hardware ?? null} questions={p.hardware_questions}
+                                  code={a?.code} drivers={judge?.drivers ?? {}} outputs={p.skeleton.outputs.map((o) => o.name)} selected={selected}
+                                  onSelect={lineBlocked ? undefined : (sig) => { setSelected(sig === selected ? null : sig); setEditorTab('design') }} />}
                         </div>
                       )}
                       {dock === 'shuffle' && <ShuffleExperiment attempt={a ?? null} skeleton={p.skeleton} onRun={runShuffle} clocked={clocked}
@@ -503,7 +505,7 @@ function nextStep(x: {
       return { text: `在下方“波形预测”里，把 ${signals} 的每个 ? 格填上你预测的值（单比特点一下切换 0/1，多位的点一下输入数字；波形可以左右滚动）。`, target: 'wave' }
     }
     if (!x.hwAnswered && p.hardware_questions.length) {
-      return { text: '切到“硬件”页，猜一猜：这段代码会综合出几个触发器？有没有锁存器？', target: 'hw' }
+      return { text: `切到“硬件”页，猜一猜：${hwAsk(p.hardware_questions)}（每个问题下面都写了怎么判断）`, target: 'hw' }
     }
     if (x.confidence === null) {
       return { text: '在左边选一下：你对这些预测有多大把握？照实选就行，没有对错，也不影响成绩。', target: 'confidence' }
@@ -533,6 +535,12 @@ function nextStep(x: {
     return { text: '这道题完成了！点右上角回到题目列表，做下一题。', target: 'primary' }
   }
   return { text: '按左边的任务清单一步一步来。', target: 'none' }
+}
+
+/** 这道题要回答的硬件问题，用一句话列出来 */
+function hwAsk(qs: string[]): string {
+  const text: Record<string, string> = { ff_count: '会综合出几个触发器', latch: '有没有锁存器', ff_signals: '哪些信号成了触发器' }
+  return qs.map((q) => text[q]).filter(Boolean).join('、')
 }
 
 // ---------------------------------------------------------------- 小工具：浏览器本地存储（只存界面偏好，失败就用默认值）
@@ -599,8 +607,8 @@ function TaskCard({ p, a, phase, allPredicted, inv, feedback, explain, setExplai
           <div className="ans">逐行看：每个输出是由哪条语句决定的？</div></div></li>}
         <li><Tick done={phase !== 'predicting'} n={2} /><div>{isModify ? '改完先预测变化：' : ''}在“<Term k="波形">波形</Term><Term k="预测">预测</Term>”里填出 {p.predict_points.map((x) => x.signal).join('、')} 的 ? 格
           <div className="ans">每个 <Term k="STEP" /> 是一个<Term k="时钟">时钟</Term>周期；单比特点击切换 0/1，多位的点击后输入二进制或 0x 开头的十六进制</div></div></li>
-        {p.hardware_questions.length > 0 && <li><Tick done={phase !== 'predicting'} n={3} /><div>在“硬件”里回答：会<Term k="综合">综合</Term>出几个<Term k="触发器">触发器</Term>、有没有<Term k="锁存器">锁存器</Term>
-          <div className="ans">纯<Term k="组合逻辑">组合逻辑</Term>没有触发器；always @(posedge clk) 里赋值的信号会变成触发器</div></div></li>}
+        {p.hardware_questions.length > 0 && <li><Tick done={phase !== 'predicting'} n={3} /><div>在“硬件”里回答：{hwAsk(p.hardware_questions)}
+          <div className="ans">这是在练“代码会变成什么硬件”：纯<Term k="组合逻辑">组合逻辑</Term>没有<Term k="触发器">触发器</Term>；always @(posedge clk) 里赋值的信号会变成触发器。“硬件”页里每个问题下面都写了怎么判断</div></div></li>}
         {p.flags.predict_step && (
           <li data-testid="task-confidence"><Tick done={phase !== 'predicting' || confidence !== null} n={4} /><div>你对这些预测有多大把握？
             {phase === 'predicting'

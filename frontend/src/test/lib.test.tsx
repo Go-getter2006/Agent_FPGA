@@ -105,3 +105,31 @@ describe('EventReporter.flushBeacon', () => {
     Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: original })
   })
 })
+
+import { explainSignals } from '../components/HardwarePanel'
+
+describe('硬件页“为什么”：信号和代码的对应', () => {
+  it('时序块里的信号是触发器，位宽来自声明；assign 驱动的是组合逻辑；漏写分支的是锁存器', () => {
+    const code = [
+      'module top_module (input wire clk, input wire a, input wire b, input wire en,',
+      '    output reg [3:0] q, output wire y, output reg z);',
+      '    always @(posedge clk) begin',
+      '        q <= q + 4\'d1;',
+      '    end',
+      '    assign y = a & b;',
+      '    always @(*) begin',
+      '        if (en) z = a;',
+      '    end',
+      'endmodule',
+    ].join('\n')
+    const rows = explainSignals({ ff_signals: ['q'], latch_signals: ['z'], ff_count: 4, lut_count: 3 } as any, code,
+      { q: [4], y: [6], z: [8] }, ['q', 'y', 'z'])
+    const by = Object.fromEntries(rows.map((r) => [r.signal, r]))
+    expect(by.q.kind).toBe('ff')
+    expect(by.q.width).toBe(4)
+    expect(by.q.text).toContain('第 4 行')
+    expect(by.y.kind).toBe('comb')
+    expect(by.y.text).toContain('assign')
+    expect(by.z.kind).toBe('latch')
+  })
+})
