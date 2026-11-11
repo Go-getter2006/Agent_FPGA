@@ -15,6 +15,8 @@ CLIENT_EVENT_TYPES = frozenset({
     "page.view", "step.enter", "problem.open", "waveform.view", "waveform.cell_click",
     # 新手入门（第 2 版）：打开一节课、答课内小测、看完做题页分步引导
     "lesson.open", "lesson.quiz", "tour.done",
+    # 电路图：打开电路图、在电路图里点一个元件
+    "schematic.view", "schematic.cell_click",
 })
 
 

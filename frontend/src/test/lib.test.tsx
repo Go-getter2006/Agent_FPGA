@@ -133,3 +133,19 @@ describe('硬件页“为什么”：信号和代码的对应', () => {
     expect(by.z.kind).toBe('latch')
   })
 })
+
+import { cellLines, sanitizeSvg } from '../components/SchematicView'
+
+describe('电路图', () => {
+  it('触发器对应它所驱动信号的赋值行；其他元件用自己的 src 行', () => {
+    const drivers = { cnt: [13, 16], led: [14, 18] }
+    expect(cellLines({ type: '$dff', lines: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20], outputs: ['led'] }, drivers)).toEqual([14, 18])
+    expect(cellLines({ type: '$add', lines: [16], outputs: [] }, drivers)).toEqual([16])
+  })
+  it('去掉 svg 里能执行脚本的内容', () => {
+    const out = sanitizeSvg('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><g id="cell_x" onclick="alert(2)"><text>q</text></g></svg>')
+    expect(out).not.toContain('script')
+    expect(out).not.toContain('onclick')
+    expect(out).toContain('cell_x')
+  })
+})

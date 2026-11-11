@@ -11,6 +11,7 @@ import { ErrorState, Loading, QuadrantBadge } from '../../components/Common'
 import { HardwareCompare, HardwarePredict, regCandidates, type HardwareAnswers } from '../../components/HardwarePanel'
 import { Term } from '../../components/Glossary'
 import HintLadder, { AnswerCard } from '../../components/HintLadder'
+import SchematicView from '../../components/SchematicView'
 import ShuffleExperiment from '../../components/ShuffleExperiment'
 import StepBar from '../../components/StepBar'
 import WaveformView from '../../components/WaveformView'
@@ -21,7 +22,7 @@ import './Workbench.css'
 
 type Phase = 'predicting' | 'ready' | 'running' | 'investigating' | 'make' | 'done'
 const CONFIDENCE_LABEL: Record<number, string> = { 1: '没把握', 2: '有点把握', 3: '很有把握' }
-type Dock = 'wave' | 'hw' | 'shuffle' | 'errors'
+type Dock = 'wave' | 'hw' | 'schematic' | 'shuffle' | 'errors'
 const RUNNING = new Set(['queued', 'running'])
 const EMPTY_HW: HardwareAnswers = { ff_count: null, latch: null, ff_signals: [] }
 
@@ -82,6 +83,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
   const [diffView, setDiffView] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [hoverLine, setHoverLine] = useState<number | null>(null)
+  const [schemLines, setSchemLines] = useState<number[] | null>(null)   // 电路图里鼠标所在元件对应的代码行
   const [explain, setExplain] = useState('')
   const [feedback, setFeedback] = useState<{ step?: string; line?: string }>({})
   const [busy, setBusy] = useState(false)
@@ -114,6 +116,12 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
     if (a && a.status === 'done' && compiled && dock === 'wave') {
       reporter.track('waveform.view', { problem_id: p.id, attempt_id: a.id })
     }
+  }, [a?.id, a?.status, dock]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (a && a.status === 'done' && compiled && dock === 'schematic') {
+      reporter.track('schematic.view', { problem_id: p.id, attempt_id: a.id })
+    }
+    if (dock !== 'schematic') setSchemLines(null)
   }, [a?.id, a?.status, dock]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 判完之后刷新题目进度；编译没通过时切到报错页
@@ -148,7 +156,8 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
   // 联动：选中信号 → 驱动行；悬停代码行 → 这一行赋值的信号
   const drivers = judge?.drivers ?? {}
   const lineBlocked = phase === 'investigating' && !!inv?.locate_line.required && !inv.locate_line.done
-  const driverLines = !lineBlocked && selected ? drivers[selected] ?? [] : []
+  const driverLines = !lineBlocked && dock === 'schematic' && schemLines ? schemLines
+    : !lineBlocked && selected ? drivers[selected] ?? [] : []
   const hoverSignals = hoverLine && !lineBlocked
     ? Object.entries(drivers).filter(([, lines]) => lines.includes(hoverLine)).map(([s]) => s) : []
   const linkedSignals = [...new Set([...(selected && !lineBlocked ? [selected] : []), ...hoverSignals])]
@@ -395,6 +404,9 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                         {phase === 'predicting' || phase === 'ready' ? '波形预测' : '波形对照'}</button>
                       <button role="tab" aria-selected={dock === 'hw'} className={(dock === 'hw' ? 'on' : '') + (waveTabPulse && next.target === 'hw' ? ' pulse' : '')}
                         onClick={() => setDock('hw')} data-testid="dock-hw">硬件</button>
+                      {judge && compiled && phase !== 'predicting' && phase !== 'ready' && phase !== 'running' &&
+                        <button role="tab" aria-selected={dock === 'schematic'} className={dock === 'schematic' ? 'on' : ''}
+                          onClick={() => setDock('schematic')} data-testid="dock-schematic">电路图</button>}
                       {showShuffle && <button role="tab" aria-selected={dock === 'shuffle'} className={dock === 'shuffle' ? 'on' : ''} onClick={() => setDock('shuffle')} data-testid="dock-shuffle">顺序打乱实验</button>}
                       {judge && !compiled && <button role="tab" aria-selected={dock === 'errors'} className={dock === 'errors' ? 'on bad' : 'bad'} onClick={() => setDock('errors')}>编译报错</button>}
                       <span className="right">
@@ -416,6 +428,13 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                                   code={a?.code} drivers={judge?.drivers ?? {}} outputs={p.skeleton.outputs.map((o) => o.name)} selected={selected}
                                   onSelect={lineBlocked ? undefined : (sig) => { setSelected(sig === selected ? null : sig); setEditorTab('design') }} />}
                         </div>
+                      )}
+                      {dock === 'schematic' && a && judge && compiled && (
+                        <SchematicView attemptId={a.id} linkBlocked={lineBlocked}
+                          highlightLines={lineBlocked ? [] : [...(hoverLine ? [hoverLine] : []), ...(selected ? drivers[selected] ?? [] : [])]}
+                          onHoverLines={(ls) => { setSchemLines(ls); if (ls) setEditorTab('design') }}
+                          onCellClick={(cell) => reporter.track('schematic.cell_click', { problem_id: p.id, attempt_id: a.id,
+                            payload: { type: cell.type, lines: cell.lines } })} />
                       )}
                       {dock === 'shuffle' && <ShuffleExperiment attempt={a ?? null} skeleton={p.skeleton} onRun={runShuffle} clocked={clocked}
                         running={!!a?.shuffle && RUNNING.has(a.shuffle.status)} />}

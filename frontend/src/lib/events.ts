@@ -3,7 +3,7 @@
 import { post } from '../api/client'
 
 export type ClientEventType = 'page.view' | 'step.enter' | 'problem.open' | 'waveform.view' | 'waveform.cell_click'
-  | 'lesson.open' | 'lesson.quiz' | 'tour.done'
+  | 'lesson.open' | 'lesson.quiz' | 'tour.done' | 'schematic.view' | 'schematic.cell_click'
 
 export interface ClientEvent {
   type: ClientEventType

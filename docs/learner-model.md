@@ -168,6 +168,7 @@ $$\mathrm{Cal}=\frac{1}{|S|}\sum_{i\in S}\big(q(c_i)-A_{\text{pred},i}\big)$$
 | answer.reveal / answer.view | 第一次查看参考答案（hint_id、failed、passed_before）/ 之后再看 |
 | lesson.open / lesson.quiz | 新手入门课：打开一节课（lesson）/ 答课内小测（lesson、question、choice、correct）；小测只用于自学，不计入学情指标 |
 | tour.done | 看完或关掉做题页的分步引导（finished） |
+| schematic.view / schematic.cell_click | 打开电路图 / 在电路图里点一个元件（type、lines） |
 | chat.send / chat.reply | session_id、length；reply 时加 llm_call_id |
 | shuffle.run | attempt_id、order_sensitive |
 | tb.submit | score、caught、missed |

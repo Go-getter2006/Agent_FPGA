@@ -165,3 +165,18 @@
 .hw-why-row .kind.ff { background: #E0E7FF; color: #3730A3; }
 .hw-why-row .kind.latch { background: #FEF3C7; color: #92400E; }
 .hw-why-row .kind.comb { background: #F3F4F6; color: #374151; }
+
+/* 电路图 */
+.schem { padding: 8px 12px; }
+.schem-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+.schem-zoom { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.schem-info { margin-top: 6px; font-size: 13px; padding: 4px 8px; background: var(--c-link); border-radius: 4px; height: 28px; line-height: 20px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.schem-canvas { margin-top: 8px; overflow: auto; }
+.schem-canvas svg { max-width: none; }
+.schem-canvas [id^="cell_"] { cursor: pointer; }
+/* 空心的元件符号（比较器的圆圈、选择器的梯形）里面也能悬停：形状的内部也算 */
+.schem-canvas [id^="cell_"] * { pointer-events: all; }
+.schem-canvas [id^="cell_"]:hover, .schem-canvas .schem-hover { filter: drop-shadow(0 0 2px #D97706); }
+.schem-canvas .schem-hl rect, .schem-canvas .schem-hl path, .schem-canvas .schem-hl circle { stroke: #D97706 !important; stroke-width: 2.5px !important; }
+.schem-canvas .schem-hl { filter: drop-shadow(0 0 3px rgba(217, 119, 6, .7)); }
+.schem-legend { font-size: 12px; margin-top: 6px; }

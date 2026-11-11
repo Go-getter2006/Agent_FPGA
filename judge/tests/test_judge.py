@@ -217,3 +217,19 @@ PROBLEMS_CODE_ADDER = """module top_module(input [3:0] a, input [3:0] b, input c
   assign {cout, sum} = a + b + cin;
 endmodule
 """
+
+
+# ---------------------------------------------------------------- 电路图网表（只用于展示）
+
+def test_schematic_src_lines_and_cells():
+    from judge.schematic import schematic, src_lines
+    assert src_lines("student.v:16.13-16.26|student.v:18.9-19.20") == [16, 18, 19]
+    assert src_lines(None) == []
+    code = (REPO_ROOT / "problems" / "b4_led_blink" / "ref.v").read_text(encoding="utf-8")
+    r = schematic(code)
+    assert r["ok"] and "top_module" in r["netlist"]["modules"]
+    types = {c["type"] for c in r["cells"].values()}
+    assert {"$add", "$eq", "$dff"} <= types
+    assert sorted(o for c in r["cells"].values() if c["type"] == "$dff" for o in c["outputs"]) == ["cnt", "led"]
+    bad = schematic("module top_module(input a, output y); assign y = a &; endmodule\n")
+    assert not bad["ok"] and "ERROR" in bad["error"]

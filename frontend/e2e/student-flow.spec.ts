@@ -115,6 +115,12 @@ test('学生从登录走完一道创作题的全部步骤', async ({ page }) => 
   await expect(page.getByTestId('hw-why')).toContainText('always @(posedge clk)')
   await expect(page.getByTestId('why-state')).toBeVisible()
   await expect(page.getByTestId('hw-why')).toContainText('组合逻辑')
+  // 电路图：yosys 综合出的电路画出来，鼠标移到元件上显示它是什么、对应第几行
+  await page.getByTestId('dock-schematic').click()
+  await expect(page.locator('.schem-canvas svg')).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('.schem-canvas [id^="cell_"]').count()).toBeGreaterThan(3)
+  await page.locator('.schem-canvas [id^="cell_$eq"]').first().hover()
+  await expect(page.getByTestId('schematic-info')).toContainText('比较器')
   await page.getByTestId('dock-wave').click()
 
   // 提示阶梯：1 级思路（问题里点出第 5 步）
