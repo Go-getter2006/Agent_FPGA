@@ -1,4 +1,4 @@
-"""生成本地开发、演示用的数据：1 名教师、1 个班级、若干学生、1 份包含全部题目的作业。
+"""生成本地开发、演示用的数据：1 名教师、1 个班级、若干学生（不自动布置作业）。
 
     DEMO_PASSWORD=... python -m backend.scripts.seed_demo [--students 5]
 
@@ -9,13 +9,12 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
-from datetime import timedelta
 
 from sqlalchemy import select
 
 from backend.app import models  # noqa: F401
-from backend.app.db import Base, SessionLocal, engine, utcnow
-from backend.app.models import Assignment, Class, Enrollment, FeatureFlags, Problem, User
+from backend.app.db import Base, SessionLocal, engine
+from backend.app.models import Class, Enrollment, FeatureFlags, User
 from backend.app.services.flags import DEFAULT_FLAGS
 from backend.app.services.problems_sync import sync_all
 from backend.app.services.security import anon_id_for, hash_password
@@ -52,13 +51,7 @@ def seed(password: str, n_students: int = 5, create_tables: bool = True) -> dict
             if db.scalar(select(Enrollment).where(Enrollment.class_id == cls.id, Enrollment.user_id == user.id)) is None:
                 db.add(Enrollment(class_id=cls.id, user_id=user.id, group="treatment", consent_status="pending"))
             logins.append(login)
-        if db.scalar(select(Assignment).where(Assignment.class_id == cls.id)) is None:
-            pids = [p.id for p in db.scalars(select(Problem).order_by(Problem.id)).all()]
-            order = ["prio_encoder4", "adder4", "counter_mod10", "shift_reg4", "seq_detector_101", "swap_regs"]
-            pids = [p for p in order if p in pids] + [p for p in pids if p not in order]
-            now = utcnow()
-            db.add(Assignment(class_id=cls.id, title="第 1 次作业：组合与时序基础", group_scope="all",
-                              problem_ids=pids, open_at=now - timedelta(days=1), due_at=now + timedelta(days=7)))
+        # 不自动布置作业：学生按题目列表的顺序（入门题在前）自己练；需要的话由教师在“作业与题库”里布置
         db.commit()
         return {"teacher": "T001", "students": logins, "class_id": cls.id}
 

@@ -23,7 +23,7 @@ export default function Students() {
   const invalidate = useInvalidate()
   if (list.isLoading) return <Loading />
   return (
-    <div data-testid="t-student">
+    <div data-testid="t-student" className={q.isPlaceholderData ? 'stale on' : 'stale'}>
       <div className="page-h"><h1>学生详情</h1>
         <Select showSearch value={current} style={{ minWidth: 220 }} optionFilterProp="label" data-testid="student-select"
           onChange={(v) => navigate(`/teacher/classes/${cid}/students/${v}`)}

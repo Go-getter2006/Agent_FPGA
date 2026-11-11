@@ -36,7 +36,7 @@ export default function Problems() {
   if (list.isLoading) return <Loading />
   if (!current) return <Empty title="还没有学生做题" />
   return (
-    <div data-testid="t-problem">
+    <div data-testid="t-problem" className={q.isPlaceholderData ? 'stale on' : 'stale'}>
       <div className="page-h"><h1>题目分析</h1>
         <Select value={current} style={{ minWidth: 220 }} onChange={(v) => navigate(`/teacher/classes/${cid}/problems/${v}`)}
           options={(list.data?.problems ?? []).map((p) => ({ value: p.problem_id, label: p.title }))} />

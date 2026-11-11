@@ -55,7 +55,8 @@ export default function Workbench() {
   }
   if (problemQ.isLoading) return <Loading rows={12} />
   if (problemQ.error || !problemQ.data) return <ErrorState error={problemQ.error} onRetry={() => problemQ.refetch()} />
-  return <WorkbenchInner p={problemQ.data} />
+  // key：换了一道题就重新挂载，代码、预测、提示等状态都从这道题重新开始
+  return <WorkbenchInner key={problemQ.data.id} p={problemQ.data} />
 }
 
 function WorkbenchInner({ p }: { p: ProblemDetail }) {
@@ -83,6 +84,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
   const [feedback, setFeedback] = useState<{ step?: string; line?: string }>({})
   const [busy, setBusy] = useState(false)
   const [hintErr, setHintErr] = useState<string | null>(null)
+  const [hintBusy, setHintBusy] = useState(false)
   const [tbSubId, setTbSubId] = useState<number | null>(p.latest_tb?.id ?? null)
   const tbQ = useTbSubmission(tbSubId)
   const lastStep = useRef<string | null>(null)
@@ -207,13 +209,16 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
   }
 
   async function requestHint() {
-    if (!a) return
+    if (!a || hintBusy) return                 // 连点两下只发一次，避免同一级提示生成两条
     setHintErr(null)
+    setHintBusy(true)
     try {
       await post(`/api/student/attempts/${a.id}/hints`)
       await invalidate(['attempt', a.id])
     } catch (e) {
       setHintErr(e instanceof ApiError ? e.message : '暂时拿不到提示')
+    } finally {
+      setHintBusy(false)
     }
   }
 
@@ -443,7 +448,7 @@ function WorkbenchInner({ p }: { p: ProblemDetail }) {
                       <div className="card-h">提示 <small>一次解锁一级</small></div>
                       <div className="card-b">
                         {a?.status === 'done'
-                          ? <HintLadder hints={a.hints} onRequest={requestHint} error={hintErr} highlight={next.target === 'hint'} />
+                          ? <HintLadder hints={a.hints} onRequest={requestHint} error={hintErr} loading={hintBusy} highlight={next.target === 'hint'} />
                           : <div className="muted">运行一次之后可以要提示。还没开始写？可以先问下面的助教“这道题要我做什么”。</div>}
                         <AnswerCard problemId={p.id} status={p.answer} onChanged={() => void invalidate(['problem', p.id])} />
                       </div>

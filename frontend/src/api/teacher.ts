@@ -1,5 +1,5 @@
 // 教师端接口
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { get } from './client'
 
 export interface TClass { id: number; name: string; term: string; students: number; groups: Record<string, number> }
@@ -33,5 +33,6 @@ export const qs = (o: Record<string, string | number | boolean | null | undefine
 export const useClasses = () => useQuery({ queryKey: ['t-classes'], queryFn: () => get<{ classes: TClass[] }>('/api/teacher/classes') })
 export const useStatus = () => useQuery({ queryKey: ['t-status'], queryFn: () => get<{ llm: { available: boolean; reason: string | null;
   spent_today_cny: number; daily_budget_cny: number; budget_exceeded: boolean } }>('/api/teacher/status'), refetchInterval: 60_000 })
+// 切换分组、学生、题目、时间范围时先保留上一次的结果（变淡显示），新结果到了再替换，页面不会闪成骨架屏
 export const useT = <T,>(key: unknown[], url: string, enabled = true) =>
-  useQuery({ queryKey: key, queryFn: () => get<T>(url), enabled })
+  useQuery({ queryKey: key, queryFn: () => get<T>(url), enabled, placeholderData: keepPreviousData })

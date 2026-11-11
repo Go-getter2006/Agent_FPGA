@@ -32,7 +32,10 @@ export default function ChatPanel({ problemId, attemptId, enabled = true }: {
   const [simplified, setSimplified] = useState(false)
   const [big, setBig] = useState(false)
 
-  useEffect(() => { if (q.data) setMessages(q.data.messages) }, [q.data])
+  const streamingRef = useRef(false)
+  streamingRef.current = streaming
+  // 正在接收回复时，不用服务端的历史记录覆盖界面（否则后台刷新会把正在显示的回复冲掉）
+  useEffect(() => { if (q.data && !streamingRef.current) setMessages(q.data.messages) }, [q.data])
   const on = enabled && (q.data?.enabled ?? true)
 
   async function send(raw?: string) {

@@ -73,7 +73,7 @@ export default function Heatmap() {
     a.click()
   }
   return (
-    <div data-testid="t-heatmap">
+    <div data-testid="t-heatmap" className={q.isPlaceholderData ? 'stale on' : 'stale'}>
       <div className="page-h"><h1>学情热力图</h1><span className="muted">格子颜色 = 掌握等级；点格子看最近的尝试</span></div>
       <div className="card"><div className="card-h">
         <span className="filters"><Segmented value={group} onChange={(v) => setGroup(String(v))} options={GROUP_OPTIONS} />
@@ -86,6 +86,7 @@ export default function Heatmap() {
         </div></div>
       <Drawer open={!!cell} onClose={() => setCell(null)} width={480}
         title={cell ? `${who(cell.row)} · ${q.data?.knowledge_points.find((k) => k.code === cell.kp)?.name}` : ''}>
+        <div className={detail.isPlaceholderData ? 'stale on' : 'stale'}>
         {detail.data?.attempts.length === 0 && <div className="muted">这个知识点上还没有尝试</div>}
         {detail.data?.attempts.map((a) => (
           <div key={a.attempt_id} className="card" style={{ padding: 12, marginBottom: 8 }}>
@@ -95,6 +96,7 @@ export default function Heatmap() {
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{a.tags.map((t: string) => TAG_LABEL[t] ?? t).join('；') || '没有标签'}</div>
           </div>
         ))}
+      </div>
       </Drawer>
     </div>
   )
